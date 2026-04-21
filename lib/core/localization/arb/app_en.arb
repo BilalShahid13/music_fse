@@ -1,0 +1,884 @@
+{
+  "@@locale": "en",
+
+  "appName": "Music FSE",
+  "@appName": { "description": "Application name" },
+
+  "navHome": "Home",
+  "@navHome": { "description": "Navigation item: Home" },
+
+  "navLibrary": "Library",
+  "@navLibrary": { "description": "Navigation item: Library" },
+
+  "navSearch": "Search",
+  "@navSearch": { "description": "Navigation item: Search" },
+
+  "navPlaylists": "Playlists",
+  "@navPlaylists": { "description": "Navigation item: Playlists" },
+
+  "navFavorites": "Favorites",
+  "@navFavorites": { "description": "Navigation item: Favorites" },
+
+  "navSettings": "Settings",
+  "@navSettings": { "description": "Navigation item: Settings" },
+
+  "libTabSongs": "Songs",
+  "@libTabSongs": { "description": "Library tab: Songs" },
+
+  "libTabAlbums": "Albums",
+  "@libTabAlbums": { "description": "Library tab: Albums" },
+
+  "libTabArtists": "Artists",
+  "@libTabArtists": { "description": "Library tab: Artists" },
+
+  "libTabGenres": "Genres",
+  "@libTabGenres": { "description": "Library tab: Genres" },
+
+  "libTabFolders": "Folders",
+  "@libTabFolders": { "description": "Library tab: Folders" },
+
+  "homeGreetingMorning": "Good morning",
+  "@homeGreetingMorning": { "description": "Home greeting in the morning" },
+
+  "homeGreetingAfternoon": "Good afternoon",
+  "@homeGreetingAfternoon": { "description": "Home greeting in the afternoon" },
+
+  "homeGreetingEvening": "Good evening",
+  "@homeGreetingEvening": { "description": "Home greeting in the evening" },
+
+  "homeQuickResume": "Quick Resume",
+  "@homeQuickResume": { "description": "Home section: Quick Resume" },
+
+  "homeRecentlyPlayed": "Recently Played",
+  "@homeRecentlyPlayed": { "description": "Home section: Recently Played" },
+
+  "homeMostPlayed": "Most Played",
+  "@homeMostPlayed": { "description": "Home section: Most Played" },
+
+  "homeRecentlyAdded": "Recently Added",
+  "@homeRecentlyAdded": { "description": "Home section: Recently Added" },
+
+  "homeQuickAccess": "Quick Access",
+  "@homeQuickAccess": { "description": "Home section: Quick Access" },
+
+  "homeRecommended": "Recommended",
+  "@homeRecommended": { "description": "Home section: Recommended" },
+
+  "homeSeeAll": "See all",
+  "@homeSeeAll": { "description": "See all button" },
+
+  "sortNameAZ": "Name (A–Z)",
+  "@sortNameAZ": { "description": "Sort option: name ascending" },
+
+  "sortNameZA": "Name (Z–A)",
+  "@sortNameZA": { "description": "Sort option: name descending" },
+
+  "sortArtist": "Artist",
+  "@sortArtist": { "description": "Sort option: by artist" },
+
+  "sortAlbum": "Album",
+  "@sortAlbum": { "description": "Sort option: by album" },
+
+  "sortDateAdded": "Date Added",
+  "@sortDateAdded": { "description": "Sort option: by date added" },
+
+  "sortDateUpdated": "Date Updated",
+  "@sortDateUpdated": { "description": "Sort option: by date updated" },
+
+  "sortYear": "Year",
+  "@sortYear": { "description": "Sort option: by year" },
+
+  "sortDuration": "Duration",
+  "@sortDuration": { "description": "Sort option: by duration" },
+
+  "sortTrackNumber": "Track Number",
+  "@sortTrackNumber": { "description": "Sort option: by track number" },
+
+  "playAll": "Play All",
+  "@playAll": { "description": "Button: Play All" },
+
+  "shuffle": "Shuffle",
+  "@shuffle": { "description": "Button: Shuffle" },
+
+  "nowPlaying": "Now Playing",
+  "@nowPlaying": { "description": "Now Playing label" },
+
+  "upNext": "Up Next",
+  "@upNext": { "description": "Up Next label" },
+
+  "queue": "Queue",
+  "@queue": { "description": "Queue label" },
+
+  "clearQueue": "Clear Queue",
+  "@clearQueue": { "description": "Button: Clear Queue" },
+
+  "clearQueueConfirm": "Clear {count} tracks from queue?",
+  "@clearQueueConfirm": {
+    "description": "Confirmation prompt for clearing queue",
+    "placeholders": {
+      "count": { "type": "int", "example": "12" }
+    }
+  },
+
+  "searchPlaceholder": "Search songs, artists, albums…",
+  "@searchPlaceholder": { "description": "Search input placeholder text" },
+
+  "recentSearches": "Recent Searches",
+  "@recentSearches": { "description": "Section header: Recent Searches" },
+
+  "clearAll": "Clear All",
+  "@clearAll": { "description": "Button: Clear All" },
+
+  "noResults": "No results",
+  "@noResults": { "description": "Empty state: no search results" },
+
+  "noResultsFor": "No results for \"{query}\"",
+  "@noResultsFor": {
+    "description": "Empty state message with query",
+    "placeholders": {
+      "query": { "type": "String", "example": "Radiohead" }
+    }
+  },
+
+  "showAll": "Show all {count}",
+  "@showAll": {
+    "description": "Link to show all results in a category",
+    "placeholders": {
+      "count": { "type": "int", "example": "42" }
+    }
+  },
+
+  "songsResults": "{count} songs",
+  "@songsResults": {
+    "description": "Count label for songs in search results",
+    "placeholders": {
+      "count": { "type": "int", "example": "5" }
+    }
+  },
+
+  "artistsResults": "{count} artists",
+  "@artistsResults": {
+    "description": "Count label for artists in search results",
+    "placeholders": {
+      "count": { "type": "int", "example": "3" }
+    }
+  },
+
+  "albumsResults": "{count} albums",
+  "@albumsResults": {
+    "description": "Count label for albums in search results",
+    "placeholders": {
+      "count": { "type": "int", "example": "2" }
+    }
+  },
+
+  "favorites": "Favorites",
+  "@favorites": { "description": "Favorites section/page title" },
+
+  "noFavoritesYet": "No favorites yet",
+  "@noFavoritesYet": { "description": "Empty state: no favorites" },
+
+  "noFavoritesMessage": "Songs you mark as favorite will appear here.",
+  "@noFavoritesMessage": { "description": "Empty state message for favorites" },
+
+  "browseLibrary": "Browse Library",
+  "@browseLibrary": { "description": "CTA button: Browse Library" },
+
+  "smartPlaylists": "Smart Playlists",
+  "@smartPlaylists": { "description": "Section header: Smart Playlists" },
+
+  "yourPlaylists": "Your Playlists",
+  "@yourPlaylists": { "description": "Section header: Your Playlists" },
+
+  "newPlaylist": "New Playlist",
+  "@newPlaylist": { "description": "Button: New Playlist" },
+
+  "importM3U": "Import M3U",
+  "@importM3U": { "description": "Button: Import M3U" },
+
+  "deletePlaylistConfirm": "Delete \"{name}\"?",
+  "@deletePlaylistConfirm": {
+    "description": "Confirmation prompt for deleting a playlist",
+    "placeholders": {
+      "name": { "type": "String", "example": "Chill Vibes" }
+    }
+  },
+
+  "recentlyAdded": "Recently Added",
+  "@recentlyAdded": { "description": "Smart playlist name: Recently Added" },
+
+  "mostPlayed": "Most Played",
+  "@mostPlayed": { "description": "Smart playlist name: Most Played" },
+
+  "recentlyPlayed": "Recently Played",
+  "@recentlyPlayed": { "description": "Smart playlist name: Recently Played" },
+
+  "settingsAppearance": "Appearance",
+  "@settingsAppearance": { "description": "Settings section: Appearance" },
+
+  "settingsLibrary": "Library",
+  "@settingsLibrary": { "description": "Settings section: Library" },
+
+  "settingsPlayback": "Playback",
+  "@settingsPlayback": { "description": "Settings section: Playback" },
+
+  "settingsControls": "Controls",
+  "@settingsControls": { "description": "Settings section: Controls" },
+
+  "settingsSystem": "System",
+  "@settingsSystem": { "description": "Settings section: System" },
+
+  "settingsAbout": "About",
+  "@settingsAbout": { "description": "Settings section: About" },
+
+  "settingsTheme": "Theme",
+  "@settingsTheme": { "description": "Settings item: Theme" },
+
+  "settingsAccentColor": "Accent Color",
+  "@settingsAccentColor": { "description": "Settings item: Accent Color" },
+
+  "settingsMusicFolders": "Music Folders",
+  "@settingsMusicFolders": { "description": "Settings item: Music Folders" },
+
+  "settingsRescanLibrary": "Rescan Library",
+  "@settingsRescanLibrary": { "description": "Settings item: Rescan Library" },
+
+  "settingsCrossfade": "Crossfade",
+  "@settingsCrossfade": { "description": "Settings item: Crossfade" },
+
+  "settingsReplayGain": "Replay Gain",
+  "@settingsReplayGain": { "description": "Settings item: Replay Gain" },
+
+  "settingsNavigationSounds": "Navigation Sounds",
+  "@settingsNavigationSounds": { "description": "Settings item: Navigation Sounds" },
+
+  "settingsAnimateFocusScrolling": "Animate Focus Scrolling",
+  "@settingsAnimateFocusScrolling": { "description": "Settings item: Animate Focus Scrolling" },
+
+  "settingsGamepadSensitivity": "Gamepad Sensitivity",
+  "@settingsGamepadSensitivity": { "description": "Settings item: Gamepad Sensitivity" },
+
+  "settingsCloseToTray": "Close to Tray",
+  "@settingsCloseToTray": { "description": "Settings item: Close to Tray" },
+
+  "settingsStartWithSystem": "Start with System",
+  "@settingsStartWithSystem": { "description": "Settings item: Start with System" },
+
+  "settingsVersion": "Version",
+  "@settingsVersion": { "description": "Settings item: Version" },
+
+  "settingsCredits": "Credits",
+  "@settingsCredits": { "description": "Settings item: Credits" },
+
+  "settingsOpenSourceProject": "Open source project for handheld-first desktop listening.",
+  "@settingsOpenSourceProject": { "description": "Settings about card helper text" },
+
+  "themeDark": "Dark",
+  "@themeDark": { "description": "Theme option: Dark" },
+
+  "themeLight": "Light",
+  "@themeLight": { "description": "Theme option: Light" },
+
+  "themeSystem": "System",
+  "@themeSystem": { "description": "Theme option: System" },
+
+  "navSoundOff": "Off",
+  "@navSoundOff": { "description": "Navigation sound option: Off" },
+
+  "navSoundQuiet": "Quiet",
+  "@navSoundQuiet": { "description": "Navigation sound option: Quiet" },
+
+  "navSoundNormal": "Normal",
+  "@navSoundNormal": { "description": "Navigation sound option: Normal" },
+
+  "equalizer": "Equalizer",
+  "@equalizer": { "description": "Equalizer page title" },
+
+  "eqSaveCustom": "Save as Custom",
+  "@eqSaveCustom": { "description": "EQ button: Save as Custom" },
+
+  "eqReset": "Reset",
+  "@eqReset": { "description": "EQ button: Reset" },
+
+  "eqPresetFlat": "Flat",
+  "@eqPresetFlat": { "description": "EQ preset: Flat" },
+
+  "eqPresetBassBoost": "Bass Boost",
+  "@eqPresetBassBoost": { "description": "EQ preset: Bass Boost" },
+
+  "eqPresetTrebleBoost": "Treble Boost",
+  "@eqPresetTrebleBoost": { "description": "EQ preset: Treble Boost" },
+
+  "eqPresetVocal": "Vocal",
+  "@eqPresetVocal": { "description": "EQ preset: Vocal" },
+
+  "eqPresetRock": "Rock",
+  "@eqPresetRock": { "description": "EQ preset: Rock" },
+
+  "eqPresetElectronic": "Electronic",
+  "@eqPresetElectronic": { "description": "EQ preset: Electronic" },
+
+  "eqPresetClassical": "Classical",
+  "@eqPresetClassical": { "description": "EQ preset: Classical" },
+
+  "eqPresetCustom": "Custom",
+  "@eqPresetCustom": { "description": "EQ preset: Custom" },
+
+  "ctxPlay": "Play",
+  "@ctxPlay": { "description": "Context menu: Play" },
+
+  "ctxPlayNext": "Play Next",
+  "@ctxPlayNext": { "description": "Context menu: Play Next" },
+
+  "ctxAddToQueue": "Add to Queue",
+  "@ctxAddToQueue": { "description": "Context menu: Add to Queue" },
+
+  "ctxAddToPlaylist": "Add to Playlist",
+  "@ctxAddToPlaylist": { "description": "Context menu: Add to Playlist" },
+
+  "selectAll": "Select All",
+  "@selectAll": { "description": "Button: select all items" },
+
+  "ctxNewPlaylist": "New Playlist",
+  "@ctxNewPlaylist": { "description": "Context menu: New Playlist" },
+
+  "ctxToggleFavorite": "Favorite",
+  "@ctxToggleFavorite": { "description": "Context menu: Toggle Favorite" },
+
+  "ctxGoToArtist": "Go to Artist",
+  "@ctxGoToArtist": { "description": "Context menu: Go to Artist" },
+
+  "ctxGoToAlbum": "Go to Album",
+  "@ctxGoToAlbum": { "description": "Context menu: Go to Album" },
+
+  "ctxRemoveFromQueue": "Remove from Queue",
+  "@ctxRemoveFromQueue": { "description": "Context menu: Remove from Queue" },
+
+  "ctxRemoveFromPlaylist": "Remove from Playlist",
+  "@ctxRemoveFromPlaylist": { "description": "Context menu: Remove from Playlist" },
+
+  "ctxReorder": "Reorder",
+  "@ctxReorder": { "description": "Context menu: Reorder" },
+
+  "cancel": "Cancel",
+  "@cancel": { "description": "Generic button: Cancel" },
+
+  "delete": "Delete",
+  "@delete": { "description": "Generic button: Delete" },
+
+  "save": "Save",
+  "@save": { "description": "Generic button: Save" },
+
+  "create": "Create",
+  "@create": { "description": "Generic button: Create" },
+
+  "confirm": "Confirm",
+  "@confirm": { "description": "Generic button: Confirm" },
+
+  "quit": "Quit",
+  "@quit": { "description": "Button: Quit app" },
+
+  "minimizeToTray": "Minimize to Tray",
+  "@minimizeToTray": { "description": "Button: Minimize to Tray" },
+
+  "keepRunning": "Keep Running",
+  "@keepRunning": { "description": "Button: Keep Running in tray" },
+
+  "keepRunningDesc": "Music FSE will continue playing in the background.",
+  "@keepRunningDesc": { "description": "Description for keep running option" },
+
+  "rememberChoice": "Remember my choice",
+  "@rememberChoice": { "description": "Checkbox: Remember choice" },
+
+  "undo": "Undo",
+  "@undo": { "description": "Toast button: Undo" },
+
+  "addedToQueue": "Added to queue",
+  "@addedToQueue": { "description": "Toast: song added to queue" },
+
+  "addedManyToQueue": "Added {count} songs to queue",
+  "@addedManyToQueue": {
+    "description": "Toast: multiple songs added to queue",
+    "placeholders": {
+      "count": { "type": "int", "example": "12" }
+    }
+  },
+
+  "removedFromQueue": "Removed from queue",
+  "@removedFromQueue": { "description": "Toast: song removed from queue" },
+
+  "addedToPlaylist": "Added to \"{name}\"",
+  "@addedToPlaylist": {
+    "description": "Toast: song added to playlist",
+    "placeholders": {
+      "name": { "type": "String", "example": "Chill Vibes" }
+    }
+  },
+
+  "addedManyToPlaylist": "Added {count} songs to \"{name}\"",
+  "@addedManyToPlaylist": {
+    "description": "Toast: multiple songs added to playlist",
+    "placeholders": {
+      "count": { "type": "int", "example": "12" },
+      "name": { "type": "String", "example": "Chill Vibes" }
+    }
+  },
+
+  "removedFromPlaylist": "Removed from \"{name}\"",
+  "@removedFromPlaylist": {
+    "description": "Toast: song removed from playlist",
+    "placeholders": {
+      "name": { "type": "String", "example": "Chill Vibes" }
+    }
+  },
+
+  "removedFromFavorites": "Removed from Favorites",
+  "@removedFromFavorites": { "description": "Toast: removed from favorites" },
+
+  "addedToFavorites": "Added to Favorites",
+  "@addedToFavorites": { "description": "Toast: added to favorites" },
+
+  "playlistCreated": "Playlist created",
+  "@playlistCreated": { "description": "Toast: playlist created" },
+
+  "playlistDeleted": "Playlist deleted",
+  "@playlistDeleted": { "description": "Toast: playlist deleted" },
+
+  "playlistRenamed": "Playlist renamed",
+  "@playlistRenamed": { "description": "Toast: playlist renamed" },
+
+  "noMusicYet": "No music yet",
+  "@noMusicYet": { "description": "Empty state: no music in library" },
+
+  "noMusicMessage": "Add a folder containing your music files to get started.",
+  "@noMusicMessage": { "description": "Empty state message for empty library" },
+
+  "addMusicFolder": "Add Music Folder",
+  "@addMusicFolder": { "description": "CTA: Add Music Folder" },
+
+  "queueEmpty": "Queue is empty",
+  "@queueEmpty": { "description": "Empty state: queue is empty" },
+
+  "queueEmptyMessage": "Songs you add will appear here.",
+  "@queueEmptyMessage": { "description": "Empty state message for empty queue" },
+
+  "onboardingWelcome": "Welcome to Music FSE",
+  "@onboardingWelcome": { "description": "Onboarding: Welcome heading" },
+
+  "onboardingDesc": "Your full-screen music experience for handheld gaming PCs.",
+  "@onboardingDesc": { "description": "Onboarding: Welcome description" },
+
+  "onboardingGetStarted": "Get Started",
+  "@onboardingGetStarted": { "description": "Onboarding: Get Started button" },
+
+  "onboardingSkip": "Skip",
+  "@onboardingSkip": { "description": "Onboarding: Skip button" },
+
+  "onboardingNext": "Next",
+  "@onboardingNext": { "description": "Onboarding: Next button" },
+
+  "onboardingBack": "Back",
+  "@onboardingBack": { "description": "Onboarding: Back button" },
+
+  "onboardingDone": "Done",
+  "@onboardingDone": { "description": "Onboarding: Done button" },
+
+  "onboardingSelectFolders": "Add Music Folders",
+  "@onboardingSelectFolders": { "description": "Onboarding step: Select Folders heading" },
+
+  "onboardingSelectFoldersDesc": "Choose folders where your music is stored. You can add or remove folders later in Settings.",
+  "@onboardingSelectFoldersDesc": { "description": "Onboarding step: Select Folders description" },
+
+  "onboardingChooseTheme": "Choose Your Look",
+  "@onboardingChooseTheme": { "description": "Onboarding step: Choose Theme heading" },
+
+  "onboardingChooseThemeDesc": "Pick a theme and accent color. You can change these any time in Settings.",
+  "@onboardingChooseThemeDesc": { "description": "Onboarding step: Choose Theme description" },
+
+  "onboardingScanProgress": "Scanning Library",
+  "@onboardingScanProgress": { "description": "Onboarding step: Scan Progress heading" },
+
+  "onboardingScanProgressDesc": "Finding your music and loading metadata…",
+  "@onboardingScanProgressDesc": { "description": "Onboarding step: Scan Progress description" },
+
+  "hintSelect": "Select",
+  "@hintSelect": { "description": "Button hint: Select (A)" },
+
+  "hintBack": "Back",
+  "@hintBack": { "description": "Button hint: Back (B)" },
+
+  "hintOptions": "Options",
+  "@hintOptions": { "description": "Button hint: Options (X)" },
+
+  "hintFavorite": "Favorite",
+  "@hintFavorite": { "description": "Button hint: Favorite (Y)" },
+
+  "hintPlay": "Play",
+  "@hintPlay": { "description": "Button hint: Play (A)" },
+
+  "hintOpen": "Open",
+  "@hintOpen": { "description": "Button hint: Open (A)" },
+
+  "hintClose": "Close",
+  "@hintClose": { "description": "Button hint: Close (B)" },
+
+  "hintPrevTrack": "Prev",
+  "@hintPrevTrack": { "description": "Button hint: Previous Track (LB)" },
+
+  "hintNextTrack": "Next",
+  "@hintNextTrack": { "description": "Button hint: Next Track (RB)" },
+
+  "hintQueue": "Queue",
+  "@hintQueue": { "description": "Button hint: Open Queue" },
+
+  "hintSearch": "Search",
+  "@hintSearch": { "description": "Button hint: Open Search" },
+
+  "scanComplete": "Scan complete",
+  "@scanComplete": { "description": "Toast: scan complete" },
+
+  "scanFoundSongs": "Found {count} songs",
+  "@scanFoundSongs": {
+    "description": "Toast: found N songs during scan",
+    "placeholders": {
+      "count": { "type": "int", "example": "1247" }
+    }
+  },
+
+  "scanFoldersInaccessible": "{count} folder(s) could not be accessed",
+  "@scanFoldersInaccessible": {
+    "description": "Warning toast: N folders were inaccessible during scan",
+    "placeholders": {
+      "count": { "type": "int", "example": "2" }
+    }
+  },
+
+  "artist": "Artist",
+  "@artist": { "description": "Generic label: Artist" },
+
+  "album": "Album",
+  "@album": { "description": "Generic label: Album" },
+
+  "genre": "Genre",
+  "@genre": { "description": "Generic label: Genre" },
+
+  "unknownArtist": "Unknown Artist",
+  "@unknownArtist": { "description": "Fallback label for unknown artist" },
+
+  "unknownAlbum": "Unknown Album",
+  "@unknownAlbum": { "description": "Fallback label for unknown album" },
+
+  "variousArtists": "Various Artists",
+  "@variousArtists": { "description": "Compilation album artist label" },
+
+  "addedXOfYSongs": "Added {added} of {total} songs ({dupes} duplicates skipped)",
+  "@addedXOfYSongs": {
+    "description": "Summary of how many songs were added during import",
+    "placeholders": {
+      "added": { "type": "int", "example": "120" },
+      "total": { "type": "int", "example": "125" },
+      "dupes": { "type": "int", "example": "5" }
+    }
+  },
+
+  "fileMissing": "File not found",
+  "@fileMissing": { "description": "Toast: audio file is missing" },
+
+  "fileMissingMessage": "The file for this track could not be found. It may have been moved or deleted.",
+  "@fileMissingMessage": { "description": "Toast detail message for missing file" },
+
+  "rescanLibrary": "Rescan Library",
+  "@rescanLibrary": { "description": "Button/prompt: Rescan Library" },
+
+  "consecutiveMissingPrompt": "Several tracks couldn't be found. Would you like to rescan your library?",
+  "@consecutiveMissingPrompt": { "description": "Dialog prompt when multiple consecutive tracks are missing" },
+
+  "playlistNameLabel": "Playlist Name",
+  "@playlistNameLabel": { "description": "Text field label for playlist name" },
+
+  "playlistNameHint": "Enter a name…",
+  "@playlistNameHint": { "description": "Text field hint for playlist name" },
+
+  "createPlaylistTitle": "New Playlist",
+  "@createPlaylistTitle": { "description": "Dialog title: Create new playlist" },
+
+  "renamePlaylistTitle": "Rename Playlist",
+  "@renamePlaylistTitle": { "description": "Dialog title: Rename playlist" },
+
+  "songs": "Songs",
+  "@songs": { "description": "Generic label: Songs" },
+
+  "albums": "Albums",
+  "@albums": { "description": "Generic label: Albums" },
+
+  "artists": "Artists",
+  "@artists": { "description": "Generic label: Artists" },
+
+  "playlists": "Playlists",
+  "@playlists": { "description": "Generic label: Playlists" },
+
+  "tracks": "{count, plural, =1{1 track} other{{count} tracks}}",
+  "@tracks": {
+    "description": "Track count label with plural form",
+    "placeholders": {
+      "count": { "type": "num", "format": "compact" }
+    }
+  },
+
+  "songsCount": "{count, plural, =1{1 song} other{{count} songs}}",
+  "@songsCount": {
+    "description": "Song count label with plural form",
+    "placeholders": {
+      "count": { "type": "num", "format": "compact" }
+    }
+  },
+
+  "queueSaveDefaultName": "Queue — {date}",
+  "@queueSaveDefaultName": {
+    "description": "Default playlist name when saving queue",
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+
+  "queueSaveTitle": "Save Queue as Playlist",
+  "@queueSaveTitle": { "description": "Title for save queue dialog" },
+
+  "queueSaveHint": "Playlist name",
+  "@queueSaveHint": { "description": "Hint text for save queue name field" },
+
+  "queueSaveConfirm": "Save",
+  "@queueSaveConfirm": { "description": "Confirm button for save queue dialog" },
+
+  "queueSaveSuccess": "Playlist created: {name}",
+  "@queueSaveSuccess": {
+    "description": "Toast shown after saving queue as playlist",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+
+  "closeToTrayDialogTitle": "Keep Music FSE running?",
+  "@closeToTrayDialogTitle": { "description": "Title for close-to-tray first-time dialog" },
+
+  "closeToTrayDialogBody": "Music FSE will continue playing in the background. You can find it in the system tray.",
+  "@closeToTrayDialogBody": { "description": "Body text for close-to-tray dialog" },
+
+  "closeToTrayMinimize": "Minimize to Tray",
+  "@closeToTrayMinimize": { "description": "Button to minimize to tray" },
+
+  "closeToTrayQuit": "Quit",
+  "@closeToTrayQuit": { "description": "Button to quit the app" },
+
+  "closeToTrayRemember": "Remember my choice",
+  "@closeToTrayRemember": { "description": "Checkbox label in close-to-tray dialog" },
+
+  "keyboardShortcuts": "Keyboard Shortcuts",
+  "@keyboardShortcuts": { "description": "Settings label for keyboard shortcuts editor" },
+
+  "editShortcut": "Edit Shortcut",
+  "@editShortcut": { "description": "Button to edit a keyboard shortcut" },
+
+  "pressKeyCombo": "Press the key combination for \"{action}\"",
+  "@pressKeyCombo": {
+    "description": "Instruction in shortcut capture dialog",
+    "placeholders": { "action": { "type": "String" } }
+  },
+
+  "shortcutConflict": "This key is already used for \"{action}\". Reassign?",
+  "@shortcutConflict": {
+    "description": "Conflict warning in shortcut editor",
+    "placeholders": { "action": { "type": "String" } }
+  },
+
+  "shortcutConflictTitle": "Shortcut Conflict",
+  "@shortcutConflictTitle": { "description": "Title for shortcut conflict dialog" },
+
+  "resetShortcut": "Reset to Default",
+  "@resetShortcut": { "description": "Button to reset a single shortcut" },
+
+  "resetAllShortcuts": "Reset All to Defaults",
+  "@resetAllShortcuts": { "description": "Button to reset all shortcuts" },
+
+  "shortcutSaved": "Shortcut updated",
+  "@shortcutSaved": { "description": "Toast after saving a shortcut" },
+
+  "lyricsComingSoon": "Lyrics coming soon",
+  "@lyricsComingSoon": { "description": "Now Playing: lyrics feature placeholder title" },
+
+  "lyricsComingSoonDesc": "This feature is planned for a future update",
+  "@lyricsComingSoonDesc": { "description": "Now Playing: lyrics feature placeholder description" },
+
+  "scanningDroppedFiles": "Adding {count} file(s) to library…",
+  "@scanningDroppedFiles": {
+    "description": "Toast shown when files are dropped onto the app",
+    "placeholders": { "count": { "type": "int" } }
+  },
+
+  "ctxAddToFavorites": "Add to Favorites",
+  "@ctxAddToFavorites": { "description": "Context menu: add to favorites" },
+
+  "ctxRemoveFromFavorites": "Remove from Favorites",
+  "@ctxRemoveFromFavorites": { "description": "Context menu: remove from favorites" },
+
+  "ctxRename": "Rename",
+  "@ctxRename": { "description": "Context menu: rename item" },
+
+  "ctxDuplicate": "Duplicate",
+  "@ctxDuplicate": { "description": "Context menu: duplicate item" },
+
+  "ctxDeletePlaylist": "Delete Playlist",
+  "@ctxDeletePlaylist": { "description": "Context menu: delete a playlist" },
+
+  "savePreset": "Save Preset",
+  "@savePreset": { "description": "Equalizer: save preset button" },
+
+  "presetNameHint": "Preset name",
+  "@presetNameHint": { "description": "Equalizer: preset name input hint" },
+
+  "trayPlayPause": "Play / Pause",
+  "@trayPlayPause": { "description": "System tray menu: play/pause" },
+
+  "trayNextTrack": "Next Track",
+  "@trayNextTrack": { "description": "System tray menu: next track" },
+
+  "trayPreviousTrack": "Previous Track",
+  "@trayPreviousTrack": { "description": "System tray menu: previous track" },
+
+  "trayShowApp": "Show Music FSE",
+  "@trayShowApp": { "description": "System tray menu: show app window" },
+
+  "trayQuit": "Quit",
+  "@trayQuit": { "description": "System tray menu: quit app" },
+
+  "noPlaylistsYet": "No Playlists Yet",
+  "@noPlaylistsYet": { "description": "Empty state: no playlists title" },
+
+  "noPlaylistsMessage": "Create a playlist to organize your music.",
+  "@noPlaylistsMessage": { "description": "Empty state: no playlists subtitle" },
+
+  "smartPlaylists": "Smart Playlists",
+  "@smartPlaylists": { "description": "Section header: smart playlists" },
+
+  "myPlaylists": "My Playlists",
+  "@myPlaylists": { "description": "Section header: user playlists" },
+
+  "failedToLoadPlaylists": "Failed to load playlists",
+  "@failedToLoadPlaylists": { "description": "Error state: playlists load failure" },
+
+  "failedToLoadSongs": "Failed to load songs",
+  "@failedToLoadSongs": { "description": "Error state: songs load failure" },
+
+  "failedToLoadFavorites": "Failed to load favorites",
+  "@failedToLoadFavorites": { "description": "Error state: favorites load failure" },
+
+  "noSongs": "No Songs",
+  "@noSongs": { "description": "Empty state: no songs title" },
+
+  "noSongsMessage": "Add a music folder in Settings to get started.",
+  "@noSongsMessage": { "description": "Empty state: no songs subtitle" },
+
+  "open": "Open",
+  "@open": { "description": "Button hint: open" },
+
+  "back": "Back",
+  "@back": { "description": "Button hint: back" },
+
+  "options": "Options",
+  "@options": { "description": "Button hint: options" },
+
+  "play": "Play",
+  "@play": { "description": "Button hint: play" },
+
+  "unfavorite": "Unfavorite",
+  "@unfavorite": { "description": "Button hint: unfavorite" },
+
+  "tryRescanLibrary": "Try rescanning your library.",
+  "@tryRescanLibrary": { "description": "Error state: hint to rescan" },
+
+  "deletePlaylistBody": "This will permanently delete this playlist. Songs won't be removed from your library.",
+  "@deletePlaylistBody": { "description": "Delete playlist confirmation body text" },
+
+  "newLabel": "New",
+  "@newLabel": { "description": "Short label for create/new button" },
+
+  "done": "Done",
+  "@done": { "description": "Generic done label" },
+
+  "selectedCount": "{count} selected",
+  "@selectedCount": {
+    "description": "Selection mode label showing how many songs are selected",
+    "placeholders": {
+      "count": { "type": "int", "example": "3" }
+    }
+  },
+
+  "playlist": "Playlist",
+  "@playlist": { "description": "Generic fallback playlist label" },
+
+  "playlistIsEmpty": "Playlist is Empty",
+  "@playlistIsEmpty": { "description": "Empty state: playlist has no songs" },
+
+  "addSongsFromLibrary": "Add songs from your library.",
+  "@addSongsFromLibrary": { "description": "Empty state: hint to add songs" },
+
+  "exitReorder": "Exit Reorder",
+  "@exitReorder": { "description": "Button hint: exit reorder mode" },
+
+  "smartTag": "Smart",
+  "@smartTag": { "description": "Tag label for smart playlists" },
+
+  "songCountDuration": "{count} songs · {duration}",
+  "@songCountDuration": {
+    "description": "Playlist subtitle with song count and duration",
+    "placeholders": {
+      "count": { "type": "int" },
+      "duration": { "type": "String" }
+    }
+  },
+
+  "eqCustom": "Custom",
+  "@eqCustom": { "description": "Equalizer: custom preset name" },
+
+  "eqBuiltIn": "Built-in",
+  "@eqBuiltIn": { "description": "Equalizer: built-in preset tag" },
+
+  "eqSaveAsPreset": "Save as Preset",
+  "@eqSaveAsPreset": { "description": "Equalizer: save as preset button" },
+
+  "eqAdjust": "Adjust",
+  "@eqAdjust": { "description": "Equalizer: gamepad hint" },
+
+  "eqFailed": "Failed to load equalizer",
+  "@eqFailed": { "description": "Equalizer: error state" },
+
+  "eqToggle": "EQ",
+  "@eqToggle": { "description": "Equalizer: toggle label" },
+
+  "resetAll": "Reset All",
+  "@resetAll": { "description": "Button: reset all to defaults" },
+
+  "shortcutsResetToDefaults": "Shortcuts reset to defaults",
+  "@shortcutsResetToDefaults": { "description": "Toast: shortcuts were reset" },
+
+  "resetToDefault": "Reset to default",
+  "@resetToDefault": { "description": "Tooltip: reset single shortcut" },
+
+  "reassign": "Reassign",
+  "@reassign": { "description": "Button: reassign a shortcut" },
+
+  "shortcutUpdated": "Shortcut updated",
+  "@shortcutUpdated": { "description": "Toast: shortcut was updated" },
+
+  "errorLoadingShortcuts": "Error loading shortcuts",
+  "@errorLoadingShortcuts": { "description": "Error state: shortcuts failed to load" },
+
+  "accentColor": "Accent Color",
+  "@accentColor": { "description": "Color picker dialog title" },
+
+  "customHex": "Custom hex",
+  "@customHex": { "description": "Color picker: custom hex input label" },
+
+  "apply": "Apply",
+  "@apply": { "description": "Generic apply button label" }
+}

@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Music FSE — UI Style Sampler</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ================================================================
+   RESET & PAGE
+   ================================================================ */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif; font-size: 14px; }
+body {
+  background: #0a0a0a;
+  color: #e0e0e0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 0 40px 0;
+  transition: background 0.3s ease;
+}
+
+/* ================================================================
+   STYLE SWITCHER BAR
+   ================================================================ */
+.switcher-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  width: 100%;
+  background: rgba(10, 10, 10, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding: 16px 24px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.switcher-bar h1 {
+  font-size: 13px;
+  font-weight: 500;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 4px;
+}
+.switcher-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.switcher-tabs button {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 18px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
+  color: #aaa;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.switcher-tabs button:hover {
+  background: rgba(255,255,255,0.08);
+  color: #ddd;
+}
+.switcher-tabs button.active {
+  background: var(--accent, #C76E00);
+  color: #fff;
+  border-color: var(--accent, #C76E00);
+}
+.style-description {
+  font-size: 13px;
+  color: #777;
+  text-align: center;
+  min-height: 20px;
+  transition: opacity 0.2s;
+}
+
+/* ================================================================
+   APP WINDOW FRAME
+   ================================================================ */
+.app-window {
+  width: 1280px;
+  height: 780px;
+  margin-top: 24px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  transition: background 0.35s ease, box-shadow 0.35s ease;
+}
+
+/* ================================================================
+   TITLE BAR
+   ================================================================ */
+.title-bar {
+  height: 36px;
+  background: var(--bg-titlebar);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background 0.35s ease;
+}
+.title-bar .app-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.title-bar .app-title .logo-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+.window-controls {
+  display: flex;
+  gap: 2px;
+}
+.window-controls span {
+  width: 36px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.window-controls span:hover { background: rgba(255,255,255,0.08); }
+.window-controls .btn-close:hover { background: #c42b1c; color: #fff; }
+
+/* ================================================================
+   APP BODY (nav + content)
+   ================================================================ */
+.app-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ================================================================
+   NAV RAIL
+   ================================================================ */
+.nav-rail {
+  width: var(--nav-width, 200px);
+  background: var(--bg-nav);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0;
+  flex-shrink: 0;
+  transition: background 0.35s ease, width 0.35s ease;
+}
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 8px;
+}
+.nav-group.nav-bottom {
+  margin-top: auto;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--nav-radius, 8px);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+.nav-item svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.nav-item:hover {
+  background: rgba(255,255,255,0.06);
+  color: var(--text-primary);
+}
+.nav-item.active {
+  background: var(--nav-active-bg);
+  color: var(--accent);
+}
+.nav-item.active svg { stroke: var(--accent); }
+.nav-separator {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 8px 16px;
+}
+
+/* ================================================================
+   MAIN CONTENT
+   ================================================================ */
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--content-padding, 24px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--section-gap, 28px);
+  background: var(--bg-primary);
+  transition: background 0.35s ease;
+}
+
+/* ================================================================
+   HERO CARD (Quick Resume)
+   ================================================================ */
+.hero-card {
+  display: flex;
+  gap: 20px;
+  padding: var(--hero-padding, 20px);
+  border-radius: var(--card-radius, 12px);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+.hero-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--hero-overlay, none);
+  pointer-events: none;
+  z-index: 0;
+}
+.hero-card > * { position: relative; z-index: 1; }
+.hero-art {
+  width: 150px;
+  height: 150px;
+  border-radius: calc(var(--card-radius, 12px) - 4px);
+  flex-shrink: 0;
+}
+.hero-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+.hero-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--accent);
+}
+.hero-title {
+  font-size: var(--hero-title-size, 24px);
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+.hero-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.hero-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+.btn-resume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border-radius: var(--btn-radius, 8px);
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-resume:hover { filter: brightness(1.15); }
+.btn-resume svg {
+  width: 16px;
+  height: 16px;
+  fill: #fff;
+  stroke: none;
+}
+.btn-shuffle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: var(--btn-radius, 8px);
+  background: rgba(255,255,255,0.08);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-shuffle:hover { background: rgba(255,255,255,0.12); }
+.btn-shuffle svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+
+/* ================================================================
+   CONTENT ROWS (Recently Played, Recommendations, Quick Access)
+   ================================================================ */
+.content-section { display: flex; flex-direction: column; gap: 14px; }
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.section-title {
+  font-size: var(--section-title-size, 18px);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.section-action {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: none;
+  background: none;
+  transition: all 0.15s;
+}
+.section-action:hover { color: var(--accent); background: rgba(255,255,255,0.05); }
+
+.card-row {
+  display: flex;
+  gap: var(--card-gap, 14px);
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.card-row::-webkit-scrollbar { height: 4px; }
+.card-row::-webkit-scrollbar-track { background: transparent; }
+.card-row::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+/* ================================================================
+   CARDS
+   ================================================================ */
+.card {
+  flex-shrink: 0;
+  width: var(--card-width, 150px);
+  cursor: pointer;
+  transition: all var(--transition-speed, 0.2s) ease;
+  border-radius: var(--card-radius, 12px);
+  background: var(--bg-card);
+  border: var(--card-border, 1px solid transparent);
+  padding: var(--card-padding, 10px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.card:hover {
+  background: var(--bg-card-hover);
+}
+.card-art {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: calc(var(--card-radius, 12px) - 6px);
+  position: relative;
+  overflow: hidden;
+}
+.card-art .play-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.card:hover .play-overlay { opacity: 1; }
+.play-overlay svg {
+  width: 32px;
+  height: 32px;
+  fill: #fff;
+}
+.card-text { display: flex; flex-direction: column; gap: 3px; }
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Playlist cards (wider, landscape) */
+.card.playlist-card {
+  width: var(--playlist-card-width, 220px);
+  flex-direction: row;
+  align-items: center;
+  padding: 12px;
+  gap: 12px;
+}
+.card.playlist-card .card-art {
+  width: 56px;
+  height: 56px;
+  aspect-ratio: auto;
+  flex-shrink: 0;
+  border-radius: calc(var(--card-radius, 12px) - 4px);
+}
+.card.playlist-card .card-text { min-width: 0; }
+.card.playlist-card .card-subtitle { font-size: 11px; }
+
+/* ================================================================
+   FOCUS STATES
+   ================================================================ */
+.card.focused,
+.btn-resume.focused,
+.nav-item.focused {
+  outline: var(--focus-width, 2px) solid var(--focus-color, var(--accent));
+  outline-offset: var(--focus-offset, 2px);
+  box-shadow: var(--focus-glow, 0 0 12px rgba(199,110,0,0.25));
+  transform: scale(var(--focus-scale, 1.02));
+  z-index: 2;
+}
+.card.focused { background: var(--bg-card-hover); }
+.nav-item.focused {
+  background: var(--nav-active-bg);
+  color: var(--text-primary);
+}
+
+/* ================================================================
+   STATS FOOTER
+   ================================================================ */
+.stats-bar {
+  font-size: 12px;
+  color: var(--text-tertiary, #555);
+  text-align: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: auto;
+}
+
+/* ================================================================
+   MINI PLAYER
+   ================================================================ */
+.mini-player {
+  height: 72px;
+  background: var(--bg-mini-player);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 14px;
+  flex-shrink: 0;
+  transition: background 0.35s ease;
+}
+.mini-art {
+  width: 48px;
+  height: 48px;
+  border-radius: calc(var(--card-radius, 12px) - 4px);
+  flex-shrink: 0;
+}
+.mini-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  width: 180px;
+}
+.mini-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mini-artist {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mini-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.mini-controls button {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  font-size: 14px;
+}
+.mini-controls button:hover { background: rgba(255,255,255,0.08); }
+.mini-controls button svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mini-controls .btn-play {
+  width: 40px;
+  height: 40px;
+  background: var(--accent);
+  color: #fff;
+}
+.mini-controls .btn-play:hover { background: var(--accent); filter: brightness(1.15); }
+.mini-controls .btn-play svg { fill: #fff; stroke: none; width: 16px; height: 16px; }
+
+.mini-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 460px;
+}
+.mini-time {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  min-width: 36px;
+  text-align: center;
+}
+.progress-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+.progress-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 57%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+.mini-volume {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 16px;
+}
+.mini-volume svg {
+  width: 18px;
+  height: 18px;
+  stroke: var(--text-secondary);
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.volume-track {
+  width: 80px;
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+.volume-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 72%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+/* ================================================================
+   BUTTON HINTS BAR
+   ================================================================ */
+.button-hints {
+  height: 36px;
+  background: var(--bg-hints, rgba(0,0,0,0.3));
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  flex-shrink: 0;
+}
+.hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.hint .btn-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.hint .btn-a { background: #4CAF50; color: #fff; }
+.hint .btn-b { background: #f44336; color: #fff; }
+.hint .btn-x { background: #2196F3; color: #fff; }
+.hint .btn-y { background: #FFC107; color: #111; }
+
+/* ================================================================
+   ALBUM ART GRADIENTS
+   ================================================================ */
+.art-1 { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); }
+.art-2 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.art-3 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+.art-4 { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+.art-5 { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+.art-6 { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+.art-7 { background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%); }
+.art-8 { background: linear-gradient(135deg, #fccb90 0%, #d57eeb 100%); }
+.art-9 { background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); }
+.art-10 { background: linear-gradient(135deg, #f5576c 0%, #ff8a5c 100%); }
+.art-11 { background: linear-gradient(135deg, #5ee7df 0%, #b490ca 100%); }
+.art-12 { background: linear-gradient(135deg, #c471f5 0%, #fa71cd 100%); }
+.art-playlist-1 { background: linear-gradient(135deg, #e44d26 0%, #f16529 100%); }
+.art-playlist-2 { background: linear-gradient(135deg, #0575e6 0%, #021b79 100%); }
+.art-playlist-3 { background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%); }
+.art-playlist-4 { background: linear-gradient(135deg, #8e2de2 0%, #4a00e0 100%); }
+
+/* ================================================================
+   DESIGN NOTES (below mockup)
+   ================================================================ */
+.design-notes {
+  width: 1280px;
+  margin-top: 20px;
+  padding: 20px 24px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.design-notes h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent, #C76E00);
+}
+.design-notes ul {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+.design-notes li {
+  font-size: 12px;
+  color: #888;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.design-notes li::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent, #C76E00);
+  flex-shrink: 0;
+}
+
+/* ================================================================
+   ================================================================
+   STYLE VARIANTS — CSS Custom Properties
+   ================================================================
+   ================================================================ */
+
+/* ──────── 1. ORIGINAL (Music FSE) ──────── */
+body.style-original {
+  --accent: #C76E00;
+  --accent-hover: #E07D00;
+  --bg-primary: #0D1117;
+  --bg-surface: #161B22;
+  --bg-card: #161B22;
+  --bg-card-hover: #1C2128;
+  --bg-nav: #0D1117;
+  --bg-titlebar: #0D1117;
+  --bg-mini-player: rgba(13, 17, 23, 0.92);
+  --bg-hints: rgba(13, 17, 23, 0.8);
+  --text-primary: #E6EDF3;
+  --text-secondary: #8B949E;
+  --text-tertiary: #484F58;
+  --border-subtle: rgba(48, 54, 61, 0.6);
+  --card-radius: 12px;
+  --card-gap: 14px;
+  --card-width: 150px;
+  --card-padding: 10px;
+  --card-border: 1px solid rgba(48, 54, 61, 0.4);
+  --btn-radius: 8px;
+  --nav-width: 200px;
+  --nav-radius: 8px;
+  --nav-active-bg: rgba(199, 110, 0, 0.1);
+  --content-padding: 24px;
+  --section-gap: 28px;
+  --section-title-size: 18px;
+  --hero-padding: 20px;
+  --hero-title-size: 24px;
+  --hero-overlay: linear-gradient(135deg, rgba(199,110,0,0.05) 0%, transparent 60%);
+  --playlist-card-width: 220px;
+  --focus-width: 2px;
+  --focus-color: #C76E00;
+  --focus-offset: 2px;
+  --focus-glow: 0 0 12px rgba(199, 110, 0, 0.25);
+  --focus-scale: 1.02;
+  --transition-speed: 0.2s;
+}
+/* Original: frosted glass mini player */
+body.style-original .mini-player {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* ──────── 2. SPOTIFY ──────── */
+body.style-spotify {
+  --accent: #C76E00;
+  --accent-hover: #E07D00;
+  --bg-primary: #121212;
+  --bg-surface: #181818;
+  --bg-card: #181818;
+  --bg-card-hover: #282828;
+  --bg-nav: #000000;
+  --bg-titlebar: #000000;
+  --bg-mini-player: #181818;
+  --bg-hints: #121212;
+  --text-primary: #FFFFFF;
+  --text-secondary: #B3B3B3;
+  --text-tertiary: #535353;
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --card-radius: 8px;
+  --card-gap: 10px;
+  --card-width: 140px;
+  --card-padding: 8px;
+  --card-border: none;
+  --btn-radius: 24px;
+  --nav-width: 200px;
+  --nav-radius: 6px;
+  --nav-active-bg: rgba(255, 255, 255, 0.08);
+  --content-padding: 20px;
+  --section-gap: 24px;
+  --section-title-size: 20px;
+  --hero-padding: 18px;
+  --hero-title-size: 26px;
+  --hero-overlay: none;
+  --playlist-card-width: 200px;
+  --focus-width: 2px;
+  --focus-color: #FFFFFF;
+  --focus-offset: 2px;
+  --focus-glow: none;
+  --focus-scale: 1.0;
+  --transition-speed: 0.15s;
+}
+/* Spotify: bold section titles, pill buttons */
+body.style-spotify .section-title { font-weight: 700; }
+body.style-spotify .btn-resume { border-radius: 24px; padding: 12px 28px; }
+body.style-spotify .btn-shuffle { border-radius: 24px; }
+body.style-spotify .mini-controls .btn-play { border-radius: 50%; }
+body.style-spotify .nav-item.active { color: #FFFFFF; }
+body.style-spotify .nav-item.active svg { stroke: #FFFFFF; }
+body.style-spotify .hero-label { color: var(--text-secondary); }
+
+/* ──────── 3. SONY / PLAYSTATION ──────── */
+body.style-sony {
+  --accent: #C76E00;
+  --accent-hover: #E07D00;
+  --bg-primary: #000000;
+  --bg-surface: #0A0E17;
+  --bg-card: #0F1520;
+  --bg-card-hover: #151D2E;
+  --bg-nav: #050810;
+  --bg-titlebar: #050810;
+  --bg-mini-player: rgba(5, 8, 16, 0.92);
+  --bg-hints: rgba(0, 0, 0, 0.6);
+  --text-primary: #FFFFFF;
+  --text-secondary: #9EA3B0;
+  --text-tertiary: #464B58;
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --card-radius: 16px;
+  --card-gap: 18px;
+  --card-width: 165px;
+  --card-padding: 12px;
+  --card-border: 1px solid rgba(255, 255, 255, 0.04);
+  --btn-radius: 12px;
+  --nav-width: 220px;
+  --nav-radius: 12px;
+  --nav-active-bg: rgba(199, 110, 0, 0.08);
+  --content-padding: 28px;
+  --section-gap: 36px;
+  --section-title-size: 20px;
+  --hero-padding: 24px;
+  --hero-title-size: 28px;
+  --hero-overlay: linear-gradient(135deg, rgba(199,110,0,0.06) 0%, rgba(15,21,32,0.4) 100%);
+  --playlist-card-width: 240px;
+  --focus-width: 3px;
+  --focus-color: #C76E00;
+  --focus-offset: 3px;
+  --focus-glow: 0 0 20px rgba(199, 110, 0, 0.3), 0 4px 24px rgba(0,0,0,0.4);
+  --focus-scale: 1.05;
+  --transition-speed: 0.25s;
+}
+/* Sony: dramatic card shadows, large art */
+body.style-sony .card { box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+body.style-sony .card.focused { box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 20px rgba(199,110,0,0.3); }
+body.style-sony .hero-art { width: 170px; height: 170px; }
+body.style-sony .hero-card { box-shadow: 0 4px 24px rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.04); }
+body.style-sony .mini-player {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+body.style-sony .nav-item { padding: 12px 14px; font-size: 14px; }
+
+/* ──────── 4. XBOX / MICROSOFT FLUENT ──────── */
+body.style-xbox {
+  --accent: #C76E00;
+  --accent-hover: #E07D00;
+  --bg-primary: #1B1B1B;
+  --bg-surface: #2D2D2D;
+  --bg-card: #2D2D2D;
+  --bg-card-hover: #383838;
+  --bg-nav: rgba(27, 27, 27, 0.75);
+  --bg-titlebar: #1B1B1B;
+  --bg-mini-player: rgba(35, 35, 35, 0.88);
+  --bg-hints: rgba(27, 27, 27, 0.7);
+  --text-primary: #FFFFFF;
+  --text-secondary: #9E9E9E;
+  --text-tertiary: #5A5A5A;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --card-radius: 4px;
+  --card-gap: 12px;
+  --card-width: 148px;
+  --card-padding: 8px;
+  --card-border: 1px solid rgba(255, 255, 255, 0.06);
+  --btn-radius: 4px;
+  --nav-width: 200px;
+  --nav-radius: 4px;
+  --nav-active-bg: rgba(255, 255, 255, 0.06);
+  --content-padding: 24px;
+  --section-gap: 26px;
+  --section-title-size: 17px;
+  --hero-padding: 20px;
+  --hero-title-size: 22px;
+  --hero-overlay: none;
+  --playlist-card-width: 210px;
+  --focus-width: 2px;
+  --focus-color: #FFFFFF;
+  --focus-offset: 2px;
+  --focus-glow: 0 0 0 1px rgba(255,255,255,0.2), 0 0 8px rgba(199,110,0,0.15);
+  --focus-scale: 1.0;
+  --transition-speed: 0.15s;
+}
+/* Xbox: acrylic nav rail + mini player, reveal highlight */
+body.style-xbox .nav-rail {
+  backdrop-filter: blur(30px) saturate(1.5);
+  -webkit-backdrop-filter: blur(30px) saturate(1.5);
+  background: rgba(27, 27, 27, 0.75);
+}
+body.style-xbox .mini-player {
+  backdrop-filter: blur(30px) saturate(1.5);
+  -webkit-backdrop-filter: blur(30px) saturate(1.5);
+}
+body.style-xbox .card {
+  transition: all 0.12s ease;
+}
+body.style-xbox .card:hover {
+  border-color: rgba(255,255,255,0.12);
+}
+body.style-xbox .card.focused {
+  border-color: #fff;
+  outline-color: #fff;
+}
+body.style-xbox .nav-item.active {
+  color: #FFFFFF;
+  border-left: 3px solid var(--accent);
+  padding-left: 9px;
+}
+body.style-xbox .nav-item.active svg { stroke: #FFFFFF; }
+body.style-xbox .section-title { font-weight: 600; font-size: 16px; }
+
+/* ──────── 5. VALVE / STEAM ──────── */
+body.style-steam {
+  --accent: #C76E00;
+  --accent-hover: #E07D00;
+  --bg-primary: #1B2838;
+  --bg-surface: #171A21;
+  --bg-card: #1E2A3A;
+  --bg-card-hover: #263A4D;
+  --bg-nav: #171A21;
+  --bg-titlebar: #171A21;
+  --bg-mini-player: #171A21;
+  --bg-hints: #0F1620;
+  --text-primary: #C7D5E0;
+  --text-secondary: #66727E;
+  --text-tertiary: #3B4755;
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --card-radius: 4px;
+  --card-gap: 12px;
+  --card-width: 155px;
+  --card-padding: 0;
+  --card-border: none;
+  --btn-radius: 3px;
+  --nav-width: 210px;
+  --nav-radius: 3px;
+  --nav-active-bg: rgba(199, 110, 0, 0.15);
+  --content-padding: 22px;
+  --section-gap: 26px;
+  --section-title-size: 16px;
+  --hero-padding: 0;
+  --hero-title-size: 24px;
+  --hero-overlay: linear-gradient(90deg, rgba(27,40,56,0.95) 0%, rgba(27,40,56,0.6) 60%, transparent 100%);
+  --playlist-card-width: 220px;
+  --focus-width: 3px;
+  --focus-color: #C76E00;
+  --focus-offset: 0px;
+  --focus-glow: 0 0 16px rgba(199, 110, 0, 0.4), 0 0 4px rgba(199, 110, 0, 0.6);
+  --focus-scale: 1.03;
+  --transition-speed: 0.2s;
+}
+/* Steam: gradient overlays, edge-to-edge art, bold weight */
+body.style-steam .card {
+  overflow: hidden;
+  background: var(--bg-card);
+}
+body.style-steam .card-art {
+  border-radius: 0;
+}
+body.style-steam .card-text {
+  padding: 8px 10px 10px;
+}
+body.style-steam .card-title { font-weight: 700; color: #C7D5E0; }
+body.style-steam .hero-card {
+  background: var(--bg-card);
+  border: none;
+  overflow: hidden;
+  padding: 0;
+  position: relative;
+}
+body.style-steam .hero-card .hero-art {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 300px;
+  height: 100%;
+  border-radius: 0;
+}
+body.style-steam .hero-info { padding: 24px; }
+body.style-steam .section-title {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+}
+body.style-steam .btn-resume {
+  background: linear-gradient(135deg, #C76E00 0%, #E09030 100%);
+  border-radius: 3px;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+body.style-steam .btn-shuffle {
+  border-radius: 3px;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+body.style-steam .nav-item {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+body.style-steam .mini-player {
+  border-top: 2px solid rgba(199, 110, 0, 0.3);
+}
+</style>
+</head>
+
+<body class="style-original">
+
+<!-- ============================================================
+     STYLE SWITCHER
+     ============================================================ -->
+<div class="switcher-bar">
+  <h1>Music FSE — Style Sampler</h1>
+  <div class="switcher-tabs">
+    <button class="active" data-style="original">Music FSE Original</button>
+    <button data-style="spotify">Spotify</button>
+    <button data-style="sony">Sony / PS5</button>
+    <button data-style="xbox">Xbox / Fluent</button>
+    <button data-style="steam">Steam / Valve</button>
+  </div>
+  <p class="style-description" id="styleDesc">
+    A warm, refined aesthetic designed specifically for Music FSE — content-focused with subtle depth.
+  </p>
+</div>
+
+<!-- ============================================================
+     APP WINDOW
+     ============================================================ -->
+<div class="app-window">
+
+  <!-- Title Bar -->
+  <div class="title-bar">
+    <div class="app-title">
+      <div class="logo-dot"></div>
+      Music FSE
+    </div>
+    <div class="window-controls">
+      <span class="btn-min">─</span>
+      <span class="btn-max">□</span>
+      <span class="btn-close">✕</span>
+    </div>
+  </div>
+
+  <!-- App Body -->
+  <div class="app-body">
+
+    <!-- Nav Rail -->
+    <nav class="nav-rail">
+      <div class="nav-group">
+        <div class="nav-item active">
+          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span>Home</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          <span>Library</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span>Search</span>
+        </div>
+      </div>
+      <div class="nav-separator"></div>
+      <div class="nav-group">
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M21 15V6"/><path d="M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path d="M12 12H3"/><path d="M16 6H3"/><path d="M12 18H3"/></svg>
+          <span>Playlists</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+          <span>Favorites</span>
+        </div>
+      </div>
+      <div class="nav-group nav-bottom">
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <span>Settings</span>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+      <!-- Quick Resume -->
+      <section class="content-section">
+        <div class="hero-card">
+          <div class="hero-art art-1"></div>
+          <div class="hero-info">
+            <div class="hero-label">Continue Listening</div>
+            <div class="hero-title">The Dark Side of the Moon</div>
+            <div class="hero-subtitle">Pink Floyd · Album · 1973</div>
+            <div class="hero-actions">
+              <button class="btn-resume focused">
+                <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Resume
+              </button>
+              <button class="btn-shuffle">
+                <svg viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+                Shuffle All
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Recently Played -->
+      <section class="content-section">
+        <div class="section-header">
+          <div class="section-title">Recently Played</div>
+          <button class="section-action">See All →</button>
+        </div>
+        <div class="card-row">
+          <div class="card">
+            <div class="card-art art-2">
+              <div class="play-overlay"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+            </div>
+            <div class="card-text">
+              <div class="card-title">Money</div>
+              <div class="card-subtitle">Pink Floyd</div>
+            </div>
+          </div>
+          <div class="card focused">
+            <div class="card-art art-3">
+              <div class="play-overlay"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+            </div>
+            <div class="card-text">
+              <div class="card-title">Bohemian Rhapsody</div>
+              <div class="card-subtitle">Queen</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-art art-4">
+              <div class="play-overlay"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+            </div>
+            <div class="card-text">
+              <div class="card-title">Hotel California</div>
+              <div class="card-subtitle">Eagles</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-art art-5">
+              <div class="play-overlay"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+            </div>
+            <div class="card-text">
+              <div class="card-title">Stairway to Heaven</div>
+              <div class="card-subtitle">Led Zeppelin</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-art art-6">
+              <div class="play-overlay"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+            </div>
+            <div class="card-text">
+              <div class="card-title">Comfortably Numb</div>
+              <div class="card-subtitle">Pink Floyd</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-art art-7">
+              <div class="play-overlay"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+            </div>
+            <div class="card-text">
+              <div class="card-title">Sweet Child O' Mine</div>
+              <div class="card-subtitle">Guns N' Roses</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-art art-8">
+              <div class="play-overlay"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+            </div>
+            <div class="card-text">
+              <div class="card-title">Back in Black</div>
+              <div class="card-subtitle">AC/DC</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Recommendations -->
+      <section class="content-section">
+        <div class="section-header">
+          <div class="section-title">More from artists you love</div>
+          <button class="section-action">Refresh ↻</button>
+        </div>
+        <div class="card-row">
+          <div class="card">
+            <div class="card-art art-9">
+              <div class="play-overlay"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+            </div>
+            <div class="card-text">
+              <div class="card-title">Wish You Were Here</div>
+              <div class="card-subtitle">Pink Floyd</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-art art-10">
+              <div class="play-overlay"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+            </div>
+            <div class="card-text">
+              <div class="card-title">Somebody to Love</div>
+              <div class="card-subtitle">Queen</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-art art-11">
+              <div class="play-overlay"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+            </div>
+            <div class="card-text">
+              <div class="card-title">Desperado</div>
+              <div class="card-subtitle">Eagles</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-art art-12">
+              <div class="play-overlay"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+            </div>
+            <div class="card-text">
+              <div class="card-title">Kashmir</div>
+              <div class="card-subtitle">Led Zeppelin</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-art art-2">
+              <div class="play-overlay"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+            </div>
+            <div class="card-text">
+              <div class="card-title">Welcome to the Jungle</div>
+              <div class="card-subtitle">Guns N' Roses</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-art art-5">
+              <div class="play-overlay"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+            </div>
+            <div class="card-text">
+              <div class="card-title">Another Brick in the Wall</div>
+              <div class="card-subtitle">Pink Floyd</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Quick Access Playlists -->
+      <section class="content-section">
+        <div class="section-header">
+          <div class="section-title">Quick Access</div>
+        </div>
+        <div class="card-row">
+          <div class="card playlist-card">
+            <div class="card-art art-playlist-1"></div>
+            <div class="card-text">
+              <div class="card-title">Road Trip Mix</div>
+              <div class="card-subtitle">24 songs · 1h 42m</div>
+            </div>
+          </div>
+          <div class="card playlist-card">
+            <div class="card-art art-playlist-2"></div>
+            <div class="card-text">
+              <div class="card-title">Late Night Chill</div>
+              <div class="card-subtitle">18 songs · 1h 12m</div>
+            </div>
+          </div>
+          <div class="card playlist-card">
+            <div class="card-art art-playlist-3"></div>
+            <div class="card-text">
+              <div class="card-title">Workout Energy</div>
+              <div class="card-subtitle">32 songs · 2h 08m</div>
+            </div>
+          </div>
+          <div class="card playlist-card">
+            <div class="card-art art-playlist-4"></div>
+            <div class="card-text">
+              <div class="card-title">Classic Rock Best</div>
+              <div class="card-subtitle">45 songs · 3h 15m</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Stats Footer -->
+      <div class="stats-bar">
+        1,247 songs · 89 artists · 45 albums · 4d 12h total playtime
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Mini Player -->
+  <div class="mini-player">
+    <div class="mini-art art-2"></div>
+    <div class="mini-info">
+      <span class="mini-title">Money</span>
+      <span class="mini-artist">Pink Floyd · The Dark Side of the Moon</span>
+    </div>
+    <div class="mini-controls">
+      <button title="Previous">
+        <svg viewBox="0 0 24 24"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
+      </button>
+      <button class="btn-play" title="Play">
+        <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      </button>
+      <button title="Next">
+        <svg viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+      </button>
+    </div>
+    <div class="mini-progress">
+      <span class="mini-time">3:45</span>
+      <div class="progress-track">
+        <div class="progress-fill"></div>
+      </div>
+      <span class="mini-time">6:22</span>
+    </div>
+    <div class="mini-volume">
+      <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+      <div class="volume-track">
+        <div class="volume-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Button Hints -->
+  <div class="button-hints">
+    <div class="hint"><span class="btn-icon btn-a">A</span> Select</div>
+    <div class="hint"><span class="btn-icon btn-b">B</span> Back</div>
+    <div class="hint"><span class="btn-icon btn-x">X</span> Options</div>
+    <div class="hint"><span class="btn-icon btn-y">Y</span> Favorite</div>
+    <div class="hint" style="margin-left: 20px; opacity: 0.6;"><span style="font-size:10px;">LB</span> Prev Track</div>
+    <div class="hint" style="opacity: 0.6;"><span style="font-size:10px;">RB</span> Next Track</div>
+  </div>
+
+</div>
+
+<!-- ============================================================
+     DESIGN NOTES
+     ============================================================ -->
+<div class="design-notes" id="designNotes">
+  <h3 id="notesTitle">Music FSE Original — Design Notes</h3>
+  <ul id="notesList">
+    <li>Warm orange accent with soft ambient glow on focused elements</li>
+    <li>Frosted glass (backdrop-filter) on mini player for depth</li>
+    <li>12px card radius — modern but not overly rounded</li>
+    <li>Comfortable spacing — content-dense without feeling cramped</li>
+    <li>Subtle gradient overlay on hero card for visual warmth</li>
+    <li>Focus scale: 1.02× — noticeable but not jarring on gamepad navigation</li>
+  </ul>
+</div>
+
+<!-- ============================================================
+     SCRIPT
+     ============================================================ -->
+<script>
+const descriptions = {
+  original: 'A warm, refined aesthetic designed specifically for Music FSE — content-focused with subtle depth.',
+  spotify: 'Dense and functional — maximum content visible with bold typography hierarchy.',
+  sony: 'Premium and spacious — dramatic focus effects with gallery-like presentation.',
+  xbox: 'Structured and layered — acrylic materials with organized grid alignment.',
+  steam: 'Bold and high-contrast — game-launcher confidence with gradient accents.'
+};
+
+const notes = {
+  original: {
+    title: 'Music FSE Original — Design Notes',
+    items: [
+      'Warm orange accent with soft ambient glow on focused elements',
+      'Frosted glass (backdrop-filter) on mini player for depth',
+      '12px card radius — modern but not overly rounded',
+      'Comfortable spacing — content-dense without feeling cramped',
+      'Subtle gradient overlay on hero card for visual warmth',
+      'Focus scale: 1.02× — noticeable but not jarring on gamepad navigation'
+    ]
+  },
+  spotify: {
+    title: 'Spotify-Inspired — Design Notes',
+    items: [
+      'Ultra-dense layout — more content visible per screen',
+      'No blur/glow effects — flat, clean surfaces only',
+      'Pill-shaped buttons (24px radius) for actions',
+      '8px card radius — compact, utilitarian cards',
+      'White focus outline (no orange) — Spotify uses white for focus, not brand color',
+      'Bold 700-weight section titles with large size contrast',
+      'No scale on focus — focus is indicated by outline only'
+    ]
+  },
+  sony: {
+    title: 'Sony / PlayStation-Inspired — Design Notes',
+    items: [
+      'Deep black (#000) background — premium, gallery-like feel',
+      'Largest cards (165px) with most generous spacing (18px gaps)',
+      'Dramatic focus: 1.05× scale + shadow lift + 3px border',
+      '16px card radius — soft, premium-feeling rounded corners',
+      'Floating card shadows throughout — creates layered depth',
+      'Blue-tinted dark surface colors echo PS5 system UI'
+    ]
+  },
+  xbox: {
+    title: 'Xbox / Microsoft Fluent — Design Notes',
+    items: [
+      'Acrylic (frosted glass) on nav rail and mini player — Fluent Design signature',
+      '4px card radius — sharp, structured, grid-aligned',
+      'White focus outline with subtle reveal-glow effect',
+      'No scale on focus — Xbox uses border highlight, not scale',
+      'Active nav item has left accent border (3px) — Fluent pattern',
+      'Neutral gray palette — lets content and accent color stand out',
+      'Information-dense but orderly — balanced between compact and readable'
+    ]
+  },
+  steam: {
+    title: 'Valve / Steam-Inspired — Design Notes',
+    items: [
+      'Blue-tinted dark background (#1B2838) — Steam\'s signature palette',
+      'Edge-to-edge card art (no padding) — game-banner aesthetic',
+      'Thickest focus ring (3px) with strongest glow — high contrast for gamepad',
+      'Uppercase section headers + nav labels — game-launcher style',
+      'Gradient button fills — adds visual weight and energy',
+      'Hero card uses full-bleed art with gradient text overlay',
+      'Mini player has top accent border — visual anchor'
+    ]
+  }
+};
+
+// Tab switching
+document.querySelectorAll('.switcher-tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    // Update active tab
+    document.querySelectorAll('.switcher-tabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Switch body class
+    const style = btn.dataset.style;
+    document.body.className = 'style-' + style;
+
+    // Update description
+    document.getElementById('styleDesc').textContent = descriptions[style];
+
+    // Update design notes
+    const noteData = notes[style];
+    document.getElementById('notesTitle').textContent = noteData.title;
+    const list = document.getElementById('notesList');
+    list.innerHTML = noteData.items.map(item => '<li>' + item + '</li>').join('');
+  });
+});
+
+// Click-to-focus simulation
+document.querySelectorAll('.card, .btn-resume, .btn-shuffle, .nav-item').forEach(el => {
+  el.addEventListener('click', (e) => {
+    // Remove focus from all elements
+    document.querySelectorAll('.focused').forEach(f => f.classList.remove('focused'));
+    // Add focus to clicked element
+    el.classList.add('focused');
+    e.stopPropagation();
+  });
+});
+
+// Click background to clear focus
+document.querySelector('.main-content').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) {
+    document.querySelectorAll('.focused').forEach(f => f.classList.remove('focused'));
+  }
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,42 @@
+Analyzing music_player_fse...                                   
+
+  error • 1 positional argument expected by 'addedToPlaylist', but 0 found • lib/presentation/helpers/add_to_playlist_helper.dart:40:66 • not_enough_positional_arguments
+  error • The named parameter 'name' isn't defined • lib/presentation/helpers/add_to_playlist_helper.dart:40:66 • undefined_named_parameter
+  error • 1 positional argument expected by 'addedToPlaylist', but 0 found • lib/presentation/helpers/add_to_playlist_helper.dart:48:36 • not_enough_positional_arguments
+  error • The named parameter 'name' isn't defined • lib/presentation/helpers/add_to_playlist_helper.dart:48:36 • undefined_named_parameter
+   info • 'value' is deprecated and shouldn't be used. Use component accessors like .r or .g, or toARGB32 for an explicit conversion • lib/presentation/pages/dialogs/color_picker_dialog.dart:97:13 • deprecated_member_use
+   info • 'value' is deprecated and shouldn't be used. Use component accessors like .r or .g, or toARGB32 for an explicit conversion • lib/presentation/pages/dialogs/color_picker_dialog.dart:182:50 • deprecated_member_use
+   info • 'value' is deprecated and shouldn't be used. Use component accessors like .r or .g, or toARGB32 for an explicit conversion • lib/presentation/pages/dialogs/color_picker_dialog.dart:182:65 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/pages/dialogs/color_picker_dialog.dart:359:39 • deprecated_member_use
+warning • Unused import: 'package:go_router/go_router.dart' • lib/presentation/pages/equalizer/equalizer_page.dart:4:8 • unused_import
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/pages/equalizer/equalizer_page.dart:387:60 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/pages/genre_detail/genre_detail_page.dart:104:80 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/pages/home/home_page.dart:576:25 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/pages/home/home_page.dart:578:44 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/pages/library/widgets/genres_tab.dart:134:34 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/pages/now_playing/now_playing_page.dart:143:39 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/pages/onboarding/onboarding_page.dart:536:36 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/pages/playlist/playlist_detail_page.dart:334:39 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/pages/playlist/playlist_detail_page.dart:336:58 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/pages/playlist/playlist_detail_page.dart:454:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/pages/playlist/playlist_detail_page.dart:456:37 • deprecated_member_use
+   info • The import of 'package:flutter/services.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' • lib/presentation/pages/playlist/playlist_list_page.dart:2:8 • unnecessary_import
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/pages/playlist/playlist_list_page.dart:432:31 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/pages/playlist/playlist_list_page.dart:434:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/pages/recently_played/recently_played_page.dart:226:56 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/pages/recently_played/recently_played_page.dart:229:60 • deprecated_member_use
+   info • The imported package 'riverpod' isn't a dependency of the importing package • lib/presentation/providers/eq_provider.dart:2:8 • depend_on_referenced_packages
+   info • The imported package 'riverpod' isn't a dependency of the importing package • lib/presentation/providers/playback_provider.dart:6:8 • depend_on_referenced_packages
+   info • The imported package 'riverpod' isn't a dependency of the importing package • lib/presentation/providers/search_provider.dart:4:8 • depend_on_referenced_packages
+   info • The imported package 'riverpod' isn't a dependency of the importing package • lib/presentation/providers/theme_provider.dart:2:8 • depend_on_referenced_packages
+   info • 'value' is deprecated and shouldn't be used. Use component accessors like .r or .g, or toARGB32 for an explicit conversion • lib/presentation/providers/theme_provider.dart:104:70 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/widgets/keyboard_shortcuts_overlay.dart:91:33 • deprecated_member_use
+   info • The import of 'package:flutter/services.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' • lib/presentation/widgets/mini_player_bar.dart:4:8 • unnecessary_import
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/widgets/scroll_to_now_playing_button.dart:54:39 • deprecated_member_use
+   info • The import of 'package:flutter/services.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' • lib/presentation/widgets/side_nav_rail.dart:2:8 • unnecessary_import
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/widgets/side_nav_rail.dart:202:28 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/widgets/song_list_tile.dart:302:37 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/widgets/toast_notification.dart:146:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/presentation/widgets/volume_osd.dart:87:38 • deprecated_member_use
+
+38 issues found. (ran in 2.8s)

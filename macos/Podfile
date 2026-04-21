@@ -1,0 +1,107 @@
+platform :osx, '14.0'
+
+# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'ephemeral', 'Flutter-Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure \"flutter pub get\" is executed first"
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Flutter-Generated.xcconfig, then run \"flutter pub get\""
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_macos_podfile_setup
+
+target 'Runner' do
+  use_frameworks!
+
+  flutter_install_all_macos_pods File.dirname(File.realpath(__FILE__))
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_macos_build_settings(target)
+    target.build_configurations.each do |config|
+      config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = '14.0'
+    end
+  end
+
+  # Fix audiotags vendored library path: CocoaPods generates $(PODS_ROOT)/../.symlinks/...
+  # but Flutter places symlinks at Flutter/ephemeral/.symlinks/...
+  installer.pods_project.build_configurations.each do |config|
+    config.build_settings.each do |key, value|
+      if value.is_a?(Array)
+        value.map! { |v| v.gsub('$(PODS_ROOT)/../.symlinks/', '$(PODS_ROOT)/../Flutter/ephemeral/.symlinks/') }
+      elsif value.is_a?(String)
+        config.build_settings[key] = value.gsub('$(PODS_ROOT)/../.symlinks/', '$(PODS_ROOT)/../Flutter/ephemeral/.symlinks/')
+      end
+    end
+  end
+
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings.each do |key, value|
+        if value.is_a?(Array)
+          value.map! { |v| v.gsub('$(PODS_ROOT)/../.symlinks/', '$(PODS_ROOT)/../Flutter/ephemeral/.symlinks/') }
+        elsif value.is_a?(String)
+          config.build_settings[key] = value.gsub('$(PODS_ROOT)/../.symlinks/', '$(PODS_ROOT)/../Flutter/ephemeral/.symlinks/')
+        end
+      end
+    end
+  end
+
+  # Remove -l"macos" from audiotags xcconfig files caused by macos.zip being
+  # picked up as a vendored library via the 'Libs/**/*' glob in the podspec.
+  installer.generated_projects.each do |project|
+    project.targets.each do |target|
+      next unless target.name == 'audiotags'
+      target.build_configurations.each do |config|
+        xcconfig_path = config.base_configuration_reference&.real_path
+        next unless xcconfig_path&.exist?
+        content = xcconfig_path.read
+        updated = content.gsub(/ -l"macos"/, '')
+        xcconfig_path.write(updated) if updated != content
+      end
+    end
+  end
+
+  # Fix audiotags FRB v1/v2 mismatch: bridge_generated.h declares symbols from
+  # flutter_rust_bridge v1 (wire_read, free_WireSyncReturn, get_dart_object, etc.)
+  # that don't exist in the FRB v2 compiled libaudiotags.a. The x86_64 linker fails
+  # because it can't dead-strip function pointer references in dummy_method_to_enforce_bundling.
+  # Replace the function body to only reference store_dart_post_cobject, which still
+  # exists in the FRB v2 library for both arm64 and x86_64.
+  audiotags_header = File.expand_path(
+    File.join('~', '.pub-cache', 'hosted', 'pub.dev', 'audiotags-1.4.5',
+              'macos', 'Classes', 'bridge_generated.h')
+  )
+  if File.exist?(audiotags_header)
+    content = File.read(audiotags_header)
+    patched = content.gsub(
+      /static int64_t dummy_method_to_enforce_bundling\(void\) \{[^}]+\}/m,
+      "static int64_t dummy_method_to_enforce_bundling(void) {\n" \
+      "    int64_t dummy_var = 0;\n" \
+      "    dummy_var ^= ((int64_t) (void*) store_dart_post_cobject);\n" \
+      "    return dummy_var;\n" \
+      "}"
+    )
+    File.write(audiotags_header, patched) if patched != content
+  end
+end
