@@ -30,8 +30,7 @@ final class PlaylistRepositoryImpl implements PlaylistRepository {
       if (!ascending) entities.sort((a, b) => b.name.compareTo(a.name));
       return Result.success(entities);
     } catch (e, st) {
-      AppLogger.error('getAllPlaylists failed',
-          tag: 'PlaylistRepo', error: e, stackTrace: st);
+      AppLogger.error('getAllPlaylists failed', tag: 'PlaylistRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -47,8 +46,7 @@ final class PlaylistRepositoryImpl implements PlaylistRepository {
       }
       return Result.success(row.toEntity());
     } catch (e, st) {
-      AppLogger.error('getPlaylistById failed',
-          tag: 'PlaylistRepo', error: e, stackTrace: st);
+      AppLogger.error('getPlaylistById failed', tag: 'PlaylistRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -59,8 +57,7 @@ final class PlaylistRepositoryImpl implements PlaylistRepository {
       final rows = await _dao.getPlaylistSongs(playlistId);
       return Result.success(rows.map((r) => r.toEntity()).toList());
     } catch (e, st) {
-      AppLogger.error('getPlaylistSongs failed',
-          tag: 'PlaylistRepo', error: e, stackTrace: st);
+      AppLogger.error('getPlaylistSongs failed', tag: 'PlaylistRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -71,8 +68,7 @@ final class PlaylistRepositoryImpl implements PlaylistRepository {
       final id = await _dao.createPlaylist(name);
       return Result.success(id);
     } catch (e, st) {
-      AppLogger.error('createPlaylist failed',
-          tag: 'PlaylistRepo', error: e, stackTrace: st);
+      AppLogger.error('createPlaylist failed', tag: 'PlaylistRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -83,8 +79,7 @@ final class PlaylistRepositoryImpl implements PlaylistRepository {
       await _dao.renamePlaylist(playlistId, name);
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('renamePlaylist failed',
-          tag: 'PlaylistRepo', error: e, stackTrace: st);
+      AppLogger.error('renamePlaylist failed', tag: 'PlaylistRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -95,8 +90,7 @@ final class PlaylistRepositoryImpl implements PlaylistRepository {
       await _dao.deletePlaylist(playlistId);
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('deletePlaylist failed',
-          tag: 'PlaylistRepo', error: e, stackTrace: st);
+      AppLogger.error('deletePlaylist failed', tag: 'PlaylistRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -107,8 +101,7 @@ final class PlaylistRepositoryImpl implements PlaylistRepository {
       await _dao.duplicatePlaylist(playlistId);
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('duplicatePlaylist failed',
-          tag: 'PlaylistRepo', error: e, stackTrace: st);
+      AppLogger.error('duplicatePlaylist failed', tag: 'PlaylistRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -122,8 +115,7 @@ final class PlaylistRepositoryImpl implements PlaylistRepository {
       await _dao.addSongToPlaylist(playlistId, songId);
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('addSongToPlaylist failed',
-          tag: 'PlaylistRepo', error: e, stackTrace: st);
+      AppLogger.error('addSongToPlaylist failed', tag: 'PlaylistRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -137,8 +129,7 @@ final class PlaylistRepositoryImpl implements PlaylistRepository {
       await _dao.removeSongFromPlaylist(playlistId, songId);
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('removeSongFromPlaylist failed',
-          tag: 'PlaylistRepo', error: e, stackTrace: st);
+      AppLogger.error('removeSongFromPlaylist failed', tag: 'PlaylistRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -153,8 +144,7 @@ final class PlaylistRepositoryImpl implements PlaylistRepository {
       await _dao.reorderPlaylistSong(playlistId, oldIndex, newIndex);
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('reorderPlaylistSong failed',
-          tag: 'PlaylistRepo', error: e, stackTrace: st);
+      AppLogger.error('reorderPlaylistSong failed', tag: 'PlaylistRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -168,8 +158,7 @@ final class PlaylistRepositoryImpl implements PlaylistRepository {
       final rows = await _dao.searchPlaylists(query, limit: limit);
       return Result.success(rows.map((r) => r.toEntity()).toList());
     } catch (e, st) {
-      AppLogger.error('searchPlaylists failed',
-          tag: 'PlaylistRepo', error: e, stackTrace: st);
+      AppLogger.error('searchPlaylists failed', tag: 'PlaylistRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -207,12 +196,10 @@ final class PlaylistRepositoryImpl implements PlaylistRepository {
       await File(dest).writeAsString(buffer.toString());
       return Result.success(dest);
     } on FileSystemException catch (e, st) {
-      AppLogger.error('exportM3u failed',
-          tag: 'PlaylistRepo', error: e, stackTrace: st);
+      AppLogger.error('exportM3u failed', tag: 'PlaylistRepo', error: e, stackTrace: st);
       return Result.failure(AppError.fileSystem(message: e.message));
     } catch (e, st) {
-      AppLogger.error('exportM3u failed',
-          tag: 'PlaylistRepo', error: e, stackTrace: st);
+      AppLogger.error('exportM3u failed', tag: 'PlaylistRepo', error: e, stackTrace: st);
       return Result.failure(AppError.fileSystem(message: e.toString()));
     }
   }
@@ -223,8 +210,7 @@ final class PlaylistRepositoryImpl implements PlaylistRepository {
       final lines = await File(filePath).readAsLines();
       final playlistName = p.basenameWithoutExtension(filePath);
 
-      final trackPaths =
-          lines.where((l) => l.isNotEmpty && !l.startsWith('#')).toList();
+      final trackPaths = lines.where((l) => l.isNotEmpty && !l.startsWith('#')).toList();
 
       final playlistId = await _dao.createPlaylist(playlistName);
 
@@ -237,12 +223,10 @@ final class PlaylistRepositoryImpl implements PlaylistRepository {
 
       return Result.success(playlistId);
     } on FileSystemException catch (e, st) {
-      AppLogger.error('importM3u failed',
-          tag: 'PlaylistRepo', error: e, stackTrace: st);
+      AppLogger.error('importM3u failed', tag: 'PlaylistRepo', error: e, stackTrace: st);
       return Result.failure(AppError.fileSystem(message: e.message));
     } catch (e, st) {
-      AppLogger.error('importM3u failed',
-          tag: 'PlaylistRepo', error: e, stackTrace: st);
+      AppLogger.error('importM3u failed', tag: 'PlaylistRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }

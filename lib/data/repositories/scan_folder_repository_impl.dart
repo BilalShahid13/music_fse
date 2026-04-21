@@ -18,8 +18,7 @@ final class ScanFolderRepositoryImpl implements ScanFolderRepository {
       final rows = await _dao.getAll();
       return Result.success(rows.map((r) => r.toEntity()).toList());
     } catch (e, st) {
-      AppLogger.error('getAll failed',
-          tag: 'ScanFolderRepo', error: e, stackTrace: st);
+      AppLogger.error('getAll failed', tag: 'ScanFolderRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -30,8 +29,7 @@ final class ScanFolderRepositoryImpl implements ScanFolderRepository {
       final id = await _dao.addFolder(path);
       return Result.success(id);
     } catch (e, st) {
-      AppLogger.error('addFolder($path) failed',
-          tag: 'ScanFolderRepo', error: e, stackTrace: st);
+      AppLogger.error('addFolder($path) failed', tag: 'ScanFolderRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -42,8 +40,7 @@ final class ScanFolderRepositoryImpl implements ScanFolderRepository {
       await _dao.removeFolder(id);
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('removeFolder($id) failed',
-          tag: 'ScanFolderRepo', error: e, stackTrace: st);
+      AppLogger.error('removeFolder($id) failed', tag: 'ScanFolderRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -57,8 +54,7 @@ final class ScanFolderRepositoryImpl implements ScanFolderRepository {
       await _dao.toggleEnabled(id, enabled: enabled);
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('toggleEnabled($id) failed',
-          tag: 'ScanFolderRepo', error: e, stackTrace: st);
+      AppLogger.error('toggleEnabled($id) failed', tag: 'ScanFolderRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -69,8 +65,7 @@ final class ScanFolderRepositoryImpl implements ScanFolderRepository {
       await _dao.updateLastScanned(id, time);
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('updateLastScanned($id) failed',
-          tag: 'ScanFolderRepo', error: e, stackTrace: st);
+      AppLogger.error('updateLastScanned($id) failed', tag: 'ScanFolderRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }

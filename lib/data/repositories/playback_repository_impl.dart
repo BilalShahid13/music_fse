@@ -27,8 +27,7 @@ final class PlaybackRepositoryImpl implements PlaybackRepository {
       final rows = await _queueDao.getQueue();
       return Result.success(rows.map((r) => r.toEntity()).toList());
     } catch (e, st) {
-      AppLogger.error('getQueue failed',
-          tag: 'PlaybackRepo', error: e, stackTrace: st);
+      AppLogger.error('getQueue failed', tag: 'PlaybackRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -43,8 +42,7 @@ final class PlaybackRepositoryImpl implements PlaybackRepository {
       await _queueDao.saveQueue(companions);
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('saveQueue failed',
-          tag: 'PlaybackRepo', error: e, stackTrace: st);
+      AppLogger.error('saveQueue failed', tag: 'PlaybackRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -55,8 +53,7 @@ final class PlaybackRepositoryImpl implements PlaybackRepository {
       await _queueDao.clearQueue();
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('clearQueue failed',
-          tag: 'PlaybackRepo', error: e, stackTrace: st);
+      AppLogger.error('clearQueue failed', tag: 'PlaybackRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -72,8 +69,7 @@ final class PlaybackRepositoryImpl implements PlaybackRepository {
       if (row == null) return Result.success(PlaybackState.initial());
       return Result.success(row.toEntity());
     } catch (e, st) {
-      AppLogger.error('getSavedPlaybackState failed',
-          tag: 'PlaybackRepo', error: e, stackTrace: st);
+      AppLogger.error('getSavedPlaybackState failed', tag: 'PlaybackRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -84,8 +80,7 @@ final class PlaybackRepositoryImpl implements PlaybackRepository {
       await _playbackDao.savePlaybackState(state.toCompanion());
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('savePlaybackState failed',
-          tag: 'PlaybackRepo', error: e, stackTrace: st);
+      AppLogger.error('savePlaybackState failed', tag: 'PlaybackRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }

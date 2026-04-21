@@ -19,8 +19,7 @@ final class PlayHistoryRepositoryImpl implements PlayHistoryRepository {
       await _dao.addEntry(entry.toCompanion());
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('addEntry failed',
-          tag: 'PlayHistoryRepo', error: e, stackTrace: st);
+      AppLogger.error('addEntry failed', tag: 'PlayHistoryRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -31,8 +30,7 @@ final class PlayHistoryRepositoryImpl implements PlayHistoryRepository {
       final rows = await _dao.getHistory(limit: limit);
       return Result.success(rows.map((r) => r.toEntity()).toList());
     } catch (e, st) {
-      AppLogger.error('getHistory failed',
-          tag: 'PlayHistoryRepo', error: e, stackTrace: st);
+      AppLogger.error('getHistory failed', tag: 'PlayHistoryRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -43,8 +41,7 @@ final class PlayHistoryRepositoryImpl implements PlayHistoryRepository {
       await _dao.clearHistory();
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('clearHistory failed',
-          tag: 'PlayHistoryRepo', error: e, stackTrace: st);
+      AppLogger.error('clearHistory failed', tag: 'PlayHistoryRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }

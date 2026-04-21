@@ -45,8 +45,7 @@ final class FileScannerImpl implements FileScanner {
     }
 
     try {
-      await for (final entity
-          in dir.list(recursive: true, followLinks: false)) {
+      await for (final entity in dir.list(recursive: true, followLinks: false)) {
         if (entity is! File) continue;
 
         final ext = _extension(entity.path);

@@ -23,8 +23,7 @@ final class SettingsRepositoryImpl implements SettingsRepository {
       final value = await _dao.getValue(key);
       return Result.success(value);
     } catch (e, st) {
-      AppLogger.error('getString($key) failed',
-          tag: 'SettingsRepo', error: e, stackTrace: st);
+      AppLogger.error('getString($key) failed', tag: 'SettingsRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -36,8 +35,7 @@ final class SettingsRepositoryImpl implements SettingsRepository {
       if (raw == null) return const Result.success(null);
       return Result.success(raw == 'true');
     } catch (e, st) {
-      AppLogger.error('getBool($key) failed',
-          tag: 'SettingsRepo', error: e, stackTrace: st);
+      AppLogger.error('getBool($key) failed', tag: 'SettingsRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -50,8 +48,7 @@ final class SettingsRepositoryImpl implements SettingsRepository {
       final parsed = int.tryParse(raw);
       return Result.success(parsed);
     } catch (e, st) {
-      AppLogger.error('getInt($key) failed',
-          tag: 'SettingsRepo', error: e, stackTrace: st);
+      AppLogger.error('getInt($key) failed', tag: 'SettingsRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -64,8 +61,7 @@ final class SettingsRepositoryImpl implements SettingsRepository {
       final parsed = double.tryParse(raw);
       return Result.success(parsed);
     } catch (e, st) {
-      AppLogger.error('getDouble($key) failed',
-          tag: 'SettingsRepo', error: e, stackTrace: st);
+      AppLogger.error('getDouble($key) failed', tag: 'SettingsRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -80,8 +76,7 @@ final class SettingsRepositoryImpl implements SettingsRepository {
       await _dao.setValue(key, value);
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('setString($key) failed',
-          tag: 'SettingsRepo', error: e, stackTrace: st);
+      AppLogger.error('setString($key) failed', tag: 'SettingsRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -92,8 +87,7 @@ final class SettingsRepositoryImpl implements SettingsRepository {
       await _dao.setValue(key, value.toString());
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('setBool($key) failed',
-          tag: 'SettingsRepo', error: e, stackTrace: st);
+      AppLogger.error('setBool($key) failed', tag: 'SettingsRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -104,8 +98,7 @@ final class SettingsRepositoryImpl implements SettingsRepository {
       await _dao.setValue(key, value.toString());
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('setInt($key) failed',
-          tag: 'SettingsRepo', error: e, stackTrace: st);
+      AppLogger.error('setInt($key) failed', tag: 'SettingsRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -116,8 +109,7 @@ final class SettingsRepositoryImpl implements SettingsRepository {
       await _dao.setValue(key, value.toString());
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('setDouble($key) failed',
-          tag: 'SettingsRepo', error: e, stackTrace: st);
+      AppLogger.error('setDouble($key) failed', tag: 'SettingsRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -128,8 +120,7 @@ final class SettingsRepositoryImpl implements SettingsRepository {
       await _dao.remove(key);
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('remove($key) failed',
-          tag: 'SettingsRepo', error: e, stackTrace: st);
+      AppLogger.error('remove($key) failed', tag: 'SettingsRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }

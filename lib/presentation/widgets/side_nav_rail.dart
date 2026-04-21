@@ -28,9 +28,7 @@ class SideNavRail extends ConsumerWidget {
     final width = MediaQuery.sizeOf(context).width;
     final expanded = width >= AppConstants.layoutBreakpoint;
     final sizes = AppSizes.of(context);
-    final navWidth = expanded
-        ? AppConstants.navRailExpandedWidth
-        : sizes.navRailCollapsedWidth;
+    final navWidth = expanded ? AppConstants.navRailExpandedWidth : sizes.navRailCollapsedWidth;
 
     final ext = context.appTheme;
     final currentRoute = ref.watch(navigationProvider);
@@ -200,9 +198,7 @@ class _NavItemState extends State<_NavItem> {
 
   bool get _isActive {
     // Match exact or prefix (e.g. /library/albums still highlights Library)
-    return widget.currentRoute == widget.route ||
-        (widget.route != '/home' &&
-            widget.currentRoute.startsWith(widget.route));
+    return widget.currentRoute == widget.route || (widget.route != '/home' && widget.currentRoute.startsWith(widget.route));
   }
 
   @override
@@ -213,8 +209,7 @@ class _NavItemState extends State<_NavItem> {
     final sizes = AppSizes.of(context);
 
     final iconColor = _isActive ? accent : ext.textSecondary;
-    final bgColor =
-        _isActive ? accent.withOpacity(0.08) : Colors.transparent;
+    final bgColor = _isActive ? accent.withOpacity(0.08) : Colors.transparent;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -225,13 +220,11 @@ class _NavItemState extends State<_NavItem> {
         child: GestureDetector(
           onTap: () => context.go(widget.route),
           child: AnimatedContainer(
-            duration:
-                const Duration(milliseconds: AppConstants.focusTransitionMs),
+            duration: const Duration(milliseconds: AppConstants.focusTransitionMs),
             constraints: const BoxConstraints(minHeight: 48),
             decoration: BoxDecoration(
               color: bgColor,
-              borderRadius:
-                  BorderRadius.circular(sizes.cardRadiusSm),
+              borderRadius: BorderRadius.circular(sizes.cardRadiusSm),
             ),
             padding: EdgeInsets.symmetric(
               horizontal: widget.expanded ? 12 : 0,
@@ -245,16 +238,13 @@ class _NavItemState extends State<_NavItem> {
                         widget.label,
                         style: tt.bodyMedium?.copyWith(
                           color: iconColor,
-                          fontWeight: _isActive
-                              ? FontWeight.w600
-                              : FontWeight.normal,
+                          fontWeight: _isActive ? FontWeight.w600 : FontWeight.normal,
                         ),
                       ),
                     ],
                   )
                 : Center(
-                    child:
-                        Icon(widget.icon, size: 22, color: iconColor),
+                    child: Icon(widget.icon, size: 22, color: iconColor),
                   ),
           ),
         ),

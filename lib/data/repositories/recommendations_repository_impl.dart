@@ -42,8 +42,7 @@ final class RecommendationsRepositoryImpl implements RecommendationsRepository {
 
       return Result.success(result);
     } catch (e, st) {
-      AppLogger.error('getRecommendationsByCategory failed',
-          tag: 'RecommendationsRepo', error: e, stackTrace: st);
+      AppLogger.error('getRecommendationsByCategory failed', tag: 'RecommendationsRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -66,8 +65,7 @@ final class RecommendationsRepositoryImpl implements RecommendationsRepository {
 
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('generateRecommendations failed',
-          tag: 'RecommendationsRepo', error: e, stackTrace: st);
+      AppLogger.error('generateRecommendations failed', tag: 'RecommendationsRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -78,8 +76,7 @@ final class RecommendationsRepositoryImpl implements RecommendationsRepository {
       await _dao.clearAll();
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('clearAll failed',
-          tag: 'RecommendationsRepo', error: e, stackTrace: st);
+      AppLogger.error('clearAll failed', tag: 'RecommendationsRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -95,16 +92,11 @@ final class RecommendationsRepositoryImpl implements RecommendationsRepository {
     DateTime now,
   ) async {
     const category = 'recently_liked';
-    final favorites = allSongs
-        .where((s) => s.isFavorite)
-        .toList()
-      ..sort((a, b) => (b.lastPlayedAt ?? DateTime(1970))
-          .compareTo(a.lastPlayedAt ?? DateTime(1970)));
+    final favorites = allSongs.where((s) => s.isFavorite).toList()
+      ..sort((a, b) => (b.lastPlayedAt ?? DateTime(1970)).compareTo(a.lastPlayedAt ?? DateTime(1970)));
 
     final companions = favorites.take(50).map((s) {
-      final daysSince = s.lastPlayedAt != null
-          ? now.difference(s.lastPlayedAt!).inDays.toDouble()
-          : 9999.0;
+      final daysSince = s.lastPlayedAt != null ? now.difference(s.lastPlayedAt!).inDays.toDouble() : 9999.0;
       final score = (1.0 - (daysSince / 365.0)).clamp(0.0, 1.0);
       return RecommendationsCompanion.insert(
         songId: s.id,
@@ -128,17 +120,13 @@ final class RecommendationsRepositoryImpl implements RecommendationsRepository {
 
     final gems = allSongs
         .where(
-          (s) =>
-              s.dateAdded.isBefore(cutoff) &&
-              s.playCount < 3 &&
-              !s.isMissing,
+          (s) => s.dateAdded.isBefore(cutoff) && s.playCount < 3 && !s.isMissing,
         )
         .toList()
       ..sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
 
     final companions = gems.take(50).map((s) {
-      final ageDays =
-          now.difference(s.dateAdded).inDays.clamp(30, 365).toDouble();
+      final ageDays = now.difference(s.dateAdded).inDays.clamp(30, 365).toDouble();
       final playPenalty = s.playCount * 0.2;
       final score = ((1.0 - (ageDays / 365.0)) - playPenalty).clamp(0.0, 1.0);
       return RecommendationsCompanion.insert(
@@ -156,10 +144,7 @@ final class RecommendationsRepositoryImpl implements RecommendationsRepository {
   /// to the max play count in the library.
   Future<void> _generateTopPlayed(List<Song> allSongs) async {
     const category = 'top_played';
-    final played = allSongs
-        .where((s) => s.playCount > 0 && !s.isMissing)
-        .toList()
-      ..sort((a, b) => b.playCount.compareTo(a.playCount));
+    final played = allSongs.where((s) => s.playCount > 0 && !s.isMissing).toList()..sort((a, b) => b.playCount.compareTo(a.playCount));
 
     if (played.isEmpty) {
       await _dao.replaceCategory(category, []);

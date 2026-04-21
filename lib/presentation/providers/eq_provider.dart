@@ -37,8 +37,7 @@ final class EqState {
   /// individual bands without saving.
   final List<double> bands;
 
-  EqPreset? get selectedPreset =>
-      selectedPresetId == null ? null : presets.where((p) => p.id == selectedPresetId).firstOrNull;
+  EqPreset? get selectedPreset => selectedPresetId == null ? null : presets.where((p) => p.id == selectedPresetId).firstOrNull;
 
   bool get hasBands => bands.length == AppConstants.eqBandCount;
 
@@ -51,9 +50,7 @@ final class EqState {
       EqState(
         isEnabled: isEnabled ?? this.isEnabled,
         presets: presets ?? this.presets,
-        selectedPresetId: selectedPresetId == _sentinel
-            ? this.selectedPresetId
-            : selectedPresetId as int?,
+        selectedPresetId: selectedPresetId == _sentinel ? this.selectedPresetId : selectedPresetId as int?,
         bands: bands ?? this.bands,
       );
 
@@ -67,8 +64,7 @@ final class EqState {
           listEquals(other.presets, presets);
 
   @override
-  int get hashCode =>
-      Object.hash(isEnabled, selectedPresetId, Object.hashAll(bands), Object.hashAll(presets));
+  int get hashCode => Object.hash(isEnabled, selectedPresetId, Object.hashAll(bands), Object.hashAll(presets));
 }
 
 // Sentinel for null-able copyWith field.
@@ -107,12 +103,9 @@ class EqNotifier extends _$EqNotifier {
     final presetId = (presetIdResult as dynamic).value as int?;
 
     // Resolve bands from the selected preset, defaulting to flat (0 dB).
-    final selectedPreset = presetId == null
-        ? presets.where((p) => p.isBuiltin).firstOrNull
-        : presets.where((p) => p.id == presetId).firstOrNull;
+    final selectedPreset = presetId == null ? presets.where((p) => p.isBuiltin).firstOrNull : presets.where((p) => p.id == presetId).firstOrNull;
 
-    final bands = selectedPreset?.bands ??
-        List<double>.filled(AppConstants.eqBandCount, 0.0);
+    final bands = selectedPreset?.bands ?? List<double>.filled(AppConstants.eqBandCount, 0.0);
 
     state = AsyncData(EqState(
       isEnabled: isEnabled,
@@ -158,9 +151,8 @@ class EqNotifier extends _$EqNotifier {
     if (current == null) return;
     if (bandIndex < 0 || bandIndex >= AppConstants.eqBandCount) return;
 
-    final newBands = List<double>.from(current.bands.length == AppConstants.eqBandCount
-        ? current.bands
-        : List<double>.filled(AppConstants.eqBandCount, 0.0));
+    final newBands =
+        List<double>.from(current.bands.length == AppConstants.eqBandCount ? current.bands : List<double>.filled(AppConstants.eqBandCount, 0.0));
     newBands[bandIndex] = gainDb.clamp(-12.0, 12.0);
 
     state = AsyncData(current.copyWith(bands: List.unmodifiable(newBands)));
@@ -231,10 +223,8 @@ class EqNotifier extends _$EqNotifier {
 
 /// Whether the equalizer is currently enabled.
 @riverpod
-bool isEqEnabled(Ref ref) =>
-    ref.watch(eqProvider.select((s) => s.value?.isEnabled ?? false));
+bool isEqEnabled(Ref ref) => ref.watch(eqProvider.select((s) => s.value?.isEnabled ?? false));
 
 /// The current per-band gains as an unmodifiable list.
 @riverpod
-List<double> eqBands(Ref ref) =>
-    ref.watch(eqProvider.select((s) => s.value?.bands ?? const []));
+List<double> eqBands(Ref ref) => ref.watch(eqProvider.select((s) => s.value?.bands ?? const []));

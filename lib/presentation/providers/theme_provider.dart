@@ -34,11 +34,7 @@ final class ThemeState {
       );
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ThemeState &&
-          other.mode == mode &&
-          other.accentColor == accentColor;
+  bool operator ==(Object other) => identical(this, other) || other is ThemeState && other.mode == mode && other.accentColor == accentColor;
 
   @override
   int get hashCode => Object.hash(mode, accentColor);
@@ -75,9 +71,7 @@ class ThemeNotifier extends _$ThemeNotifier {
       _ => ThemeModeSetting.dark,
     };
 
-    final accentColor = colorInt != null
-        ? Color(colorInt)
-        : const Color(AppConstants.defaultAccentColorValue);
+    final accentColor = colorInt != null ? Color(colorInt) : const Color(AppConstants.defaultAccentColorValue);
 
     state = ThemeState(mode: mode, accentColor: accentColor);
   }
@@ -129,10 +123,8 @@ class ThemeNotifier extends _$ThemeNotifier {
 
 /// Current accent color — avoids rebuilding widgets that only care about color.
 @riverpod
-Color accentColor(Ref ref) =>
-    ref.watch(themeProvider.select((s) => s.accentColor));
+Color accentColor(Ref ref) => ref.watch(themeProvider.select((s) => s.accentColor));
 
 /// Current theme mode setting.
 @riverpod
-ThemeModeSetting themeModeSetting(Ref ref) =>
-    ref.watch(themeProvider.select((s) => s.mode));
+ThemeModeSetting themeModeSetting(Ref ref) => ref.watch(themeProvider.select((s) => s.mode));

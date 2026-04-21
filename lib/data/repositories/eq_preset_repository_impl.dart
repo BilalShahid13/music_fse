@@ -18,8 +18,7 @@ final class EqPresetRepositoryImpl implements EqPresetRepository {
       final rows = await _dao.getAll();
       return Result.success(rows.map((r) => r.toEntity()).toList());
     } catch (e, st) {
-      AppLogger.error('getAll failed',
-          tag: 'EqPresetRepo', error: e, stackTrace: st);
+      AppLogger.error('getAll failed', tag: 'EqPresetRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -35,8 +34,7 @@ final class EqPresetRepositoryImpl implements EqPresetRepository {
       }
       return Result.success(row.toEntity());
     } catch (e, st) {
-      AppLogger.error('getById($id) failed',
-          tag: 'EqPresetRepo', error: e, stackTrace: st);
+      AppLogger.error('getById($id) failed', tag: 'EqPresetRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -47,8 +45,7 @@ final class EqPresetRepositoryImpl implements EqPresetRepository {
       final id = await _dao.createPreset(name, eqBandsToJson(bands));
       return Result.success(id);
     } catch (e, st) {
-      AppLogger.error('createPreset failed',
-          tag: 'EqPresetRepo', error: e, stackTrace: st);
+      AppLogger.error('createPreset failed', tag: 'EqPresetRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -59,8 +56,7 @@ final class EqPresetRepositoryImpl implements EqPresetRepository {
       await _dao.updatePreset(id, eqBandsToJson(bands));
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('updatePreset($id) failed',
-          tag: 'EqPresetRepo', error: e, stackTrace: st);
+      AppLogger.error('updatePreset($id) failed', tag: 'EqPresetRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }
@@ -71,8 +67,7 @@ final class EqPresetRepositoryImpl implements EqPresetRepository {
       await _dao.deletePreset(id);
       return const Result.success(null);
     } catch (e, st) {
-      AppLogger.error('deletePreset($id) failed',
-          tag: 'EqPresetRepo', error: e, stackTrace: st);
+      AppLogger.error('deletePreset($id) failed', tag: 'EqPresetRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }

@@ -142,8 +142,7 @@ class _AlbumCardState extends State<AlbumCard> {
   }) {
     final sizes = AppSizes.of(context);
     final cueIconSize = size * 0.32;
-    final placeholderIconOffset = widget.artPlaceholderIconOffset ??
-        (sizes.isCompact ? Offset.zero : Offset(size * 0.024, size * 0.012));
+    final placeholderIconOffset = widget.artPlaceholderIconOffset ?? (sizes.isCompact ? Offset.zero : Offset(size * 0.024, size * 0.012));
 
     Widget art;
     if (widget.artCachePath != null) {
