@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../widgets/gamepad_button_hints.dart';
 
 /// Generic confirmation dialog used for destructive operations.
 ///
@@ -83,6 +84,8 @@ class _ConfirmDialogState extends State<_ConfirmDialog> {
     _cancelFocus = FocusNode(debugLabel: 'ConfirmDialog-cancel');
     _confirmFocus = FocusNode(debugLabel: 'ConfirmDialog-confirm');
     _keyListenerFocusNode = FocusNode(debugLabel: 'ConfirmDialogState-keyListener')..skipTraversal = true;
+    _cancelFocus.addListener(_handleFocusChanged);
+    _confirmFocus.addListener(_handleFocusChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _cancelFocus.requestFocus();
     });
@@ -90,15 +93,42 @@ class _ConfirmDialogState extends State<_ConfirmDialog> {
 
   @override
   void dispose() {
+    _cancelFocus.removeListener(_handleFocusChanged);
+    _confirmFocus.removeListener(_handleFocusChanged);
     _cancelFocus.dispose();
     _confirmFocus.dispose();
     _keyListenerFocusNode.dispose();
     super.dispose();
   }
 
+  void _handleFocusChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  void _handlePrimaryAction() {
+    if (_cancelFocus.hasFocus) {
+      Navigator.of(context).pop(false);
+      return;
+    }
+
+    Navigator.of(context).pop(true);
+  }
+
+  String _primaryHintLabel() {
+    if (_cancelFocus.hasFocus) return widget.cancelLabel;
+    return widget.confirmLabel;
+  }
+
   KeyEventResult _handleKey(KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    if (event.logicalKey == LogicalKeyboardKey.escape || event.logicalKey == LogicalKeyboardKey.gameButtonB) {
+    if (event.logicalKey == LogicalKeyboardKey.gameButtonA) {
+      _handlePrimaryAction();
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.escape ||
+        event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+        event.logicalKey == LogicalKeyboardKey.keyB) {
       Navigator.of(context).pop(false);
       return KeyEventResult.handled;
     }
@@ -110,8 +140,6 @@ class _ConfirmDialogState extends State<_ConfirmDialog> {
     final ext = context.appTheme;
     final tt = Theme.of(context).textTheme;
     final sizes = AppSizes.of(context);
-    final accent = Theme.of(context).colorScheme.primary;
-    final confirmColor = widget.isDangerous ? ext.destructive : accent;
 
     return KeyboardListener(
       focusNode: _keyListenerFocusNode,
@@ -162,7 +190,6 @@ class _ConfirmDialogState extends State<_ConfirmDialog> {
                         label: widget.cancelLabel,
                         focusNode: _cancelFocus,
                         isPrimary: false,
-                        color: ext.textSecondary,
                         onPressed: () => Navigator.of(context).pop(false),
                       ),
                       const SizedBox(width: 12),
@@ -170,11 +197,18 @@ class _ConfirmDialogState extends State<_ConfirmDialog> {
                         label: widget.confirmLabel,
                         focusNode: _confirmFocus,
                         isPrimary: true,
-                        color: confirmColor,
                         onPressed: () => Navigator.of(context).pop(true),
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(height: 16),
+                GamepadButtonHints(
+                  aLabel: _primaryHintLabel(),
+                  bLabel: widget.cancelLabel,
+                  onAPressed: _handlePrimaryAction,
+                  onBPressed: () => Navigator.of(context).pop(false),
+                  backgroundColor: ext.bgSurface,
                 ),
               ],
             ),
@@ -194,43 +228,27 @@ class _DialogButton extends StatelessWidget {
     required this.label,
     required this.focusNode,
     required this.isPrimary,
-    required this.color,
     required this.onPressed,
   });
 
   final String label;
   final FocusNode focusNode;
   final bool isPrimary;
-  final Color color;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final tt = Theme.of(context).textTheme;
     if (isPrimary) {
       return FilledButton(
         focusNode: focusNode,
-        style: FilledButton.styleFrom(
-          backgroundColor: color,
-          minimumSize: const Size(88, AppConstants.minFocusableSize),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppConstants.btnRadius),
-          ),
-        ),
         onPressed: onPressed,
-        child: Text(label, style: tt.labelLarge?.copyWith(color: Colors.white)),
+        child: Text(label),
       );
     }
     return OutlinedButton(
       focusNode: focusNode,
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size(88, AppConstants.minFocusableSize),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppConstants.btnRadius),
-        ),
-      ),
       onPressed: onPressed,
-      child: Text(label, style: tt.labelLarge?.copyWith(color: color)),
+      child: Text(label),
     );
   }
 }

@@ -27,4 +27,9 @@ bool SendNamedPipeMessage(const std::string& pipe_name,
 // Brings the existing Flutter runner window to the foreground.
 void FocusExistingFlutterWindow();
 
+// Registers a Start Menu shortcut for the unpackaged desktop app so Windows
+// shell surfaces can resolve the AppUserModelID to a friendly name and icon.
+void EnsureAppUserModelShellLink(const wchar_t* app_id,
+								 const wchar_t* app_name);
+
 #endif  // RUNNER_UTILS_H_

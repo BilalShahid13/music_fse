@@ -9,8 +9,10 @@ import '../../../core/localization/generated/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/entities/playback_state.dart';
 import '../../../domain/entities/song.dart';
+import '../../../platform/xinput/gamepad_scroll_target.dart';
 import '../../providers/favorites_provider.dart';
 import '../../providers/home_provider.dart';
+import '../../providers/navigation_provider.dart';
 import '../../providers/playback_provider.dart';
 import '../../providers/toast_provider.dart';
 import '../../providers/scan_provider.dart';
@@ -43,6 +45,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   late final FocusNode _resumeFocus;
   late final FocusNode _firstSectionFocus;
   late final FocusNode _keyListenerFocusNode;
+  late final ScrollController _scrollController;
 
   @override
   void initState() {
@@ -50,14 +53,25 @@ class _HomePageState extends ConsumerState<HomePage> {
     _resumeFocus = FocusNode(debugLabel: 'Home-resume');
     _firstSectionFocus = FocusNode(debugLabel: 'Home-firstSection');
     _keyListenerFocusNode = FocusNode(debugLabel: 'HomePage-keyListener')..skipTraversal = true;
+    _scrollController = ScrollController();
   }
 
   @override
   void dispose() {
+    GamepadScrollTarget.clear(_scrollController);
+    _scrollController.dispose();
     _resumeFocus.dispose();
     _firstSectionFocus.dispose();
     _keyListenerFocusNode.dispose();
     super.dispose();
+  }
+
+  void _syncGamepadScrollTarget(bool isHomeRouteActive) {
+    if (isHomeRouteActive) {
+      GamepadScrollTarget.set(_scrollController);
+    } else {
+      GamepadScrollTarget.clear(_scrollController);
+    }
   }
 
   KeyEventResult _handleKey(KeyEvent event) {
@@ -96,6 +110,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     final recommendationsAsync = ref.watch(recommendationsProvider);
     final statsAsync = ref.watch(libraryStatsProvider);
     final scanState = ref.watch(scanProvider);
+    final currentRoute = ref.watch(navigationProvider);
+
+    _syncGamepadScrollTarget(currentRoute == '/home');
 
     return KeyboardListener(
       focusNode: _keyListenerFocusNode,
@@ -103,6 +120,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       child: Scaffold(
         backgroundColor: ext.bgDeep,
         body: CustomScrollView(
+          controller: _scrollController,
           slivers: [
             // ── Padding top ────────────────────────────────────────────────
             SliverPadding(padding: EdgeInsets.only(top: sizes.screenEdgePadding)),
@@ -363,7 +381,6 @@ class _SongRowSection extends ConsumerWidget {
     final ext = context.appTheme;
     final tt = Theme.of(context).textTheme;
     final l10n = AppLocalizations.of(context)!;
-    final accent = Theme.of(context).colorScheme.primary;
     final sizes = AppSizes.of(context);
     final currentSongId = ref.watch(playbackProvider.select((s) => s.currentSong?.id));
     final homePlaceholderIconOffset = Offset(
@@ -401,10 +418,7 @@ class _SongRowSection extends ConsumerWidget {
                   if (onSeeAll != null)
                     TextButton(
                       onPressed: onSeeAll,
-                      child: Text(
-                        l10n.homeSeeAll,
-                        style: tt.bodyMedium?.copyWith(color: accent),
-                      ),
+                      child: Text(l10n.homeSeeAll),
                     ),
                 ],
               ),
@@ -640,9 +654,9 @@ class _ScanBanner extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: accent.withOpacity(0.08),
+          color: accent.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(sizes.cardRadiusSm),
-          border: Border.all(color: accent.withOpacity(0.3)),
+          border: Border.all(color: accent.withValues(alpha: 0.3)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

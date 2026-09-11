@@ -3,6 +3,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_fse/data/datasources/local/database.dart';
 import 'package:music_fse/data/datasources/local/song_dao.dart';
+import 'package:path/path.dart' as p;
 
 void main() {
   late AppDatabase db;
@@ -166,6 +167,33 @@ void main() {
       await dao.upsertSong(makeSong(filePath: '/new.mp3'));
       final recent = await dao.getRecentlyAdded(limit: 1);
       expect(recent.length, 1);
+    });
+  });
+
+  group('folder queries', () {
+    test('getSongsByFolder matches songs beneath the folder path', () async {
+      final separator = p.separator;
+      final folderPath = ['library', 'album'].join(separator);
+
+      await dao.upsertSong(
+        makeSong(
+          filePath: '$folderPath${separator}track_01.mp3',
+          title: 'Direct Track',
+        ),
+      );
+      await dao.upsertSong(
+        makeSong(
+          filePath: '$folderPath${separator}disc_2${separator}track_02.mp3',
+          title: 'Nested Track',
+        ),
+      );
+
+      final songs = await dao.getSongsByFolder(folderPath);
+
+      expect(
+        songs.map((song) => song.title).toList(),
+        ['Direct Track', 'Nested Track'],
+      );
     });
   });
 

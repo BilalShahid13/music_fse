@@ -34,7 +34,6 @@ class GenreListTile extends StatefulWidget {
 
 class _GenreListTileState extends State<GenreListTile> {
   late final FocusNode _focusNode;
-  bool _isHovered = false;
 
   @override
   void initState() {
@@ -53,8 +52,6 @@ class _GenreListTileState extends State<GenreListTile> {
     final ext = context.appTheme;
     final tt = Theme.of(context).textTheme;
     final sizes = AppSizes.of(context);
-
-    final bgColor = _isHovered ? ext.bgCardHover : Colors.transparent;
     final songLabel =
         '${widget.songCount} ${widget.songCount == 1 ? "song" : "songs"}';
 
@@ -62,51 +59,47 @@ class _GenreListTileState extends State<GenreListTile> {
       focusNode: _focusNode,
       borderRadius: sizes.cardRadiusSm,
       onPressed: widget.onTap,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _isHovered = true),
-        onExit: (_) => setState(() => _isHovered = false),
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 80),
-            height: AppConstants.listTileHeight,
-            padding: EdgeInsets.symmetric(
-                horizontal: sizes.screenEdgePadding),
-            color: bgColor,
-            child: Row(
-              children: [
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 80),
+          height: AppConstants.listTileHeight,
+          padding: EdgeInsets.symmetric(
+              horizontal: sizes.screenEdgePadding),
+          color: Colors.transparent,
+          child: Row(
+            children: [
                 // Colored genre icon
-                _GenreIcon(genreName: widget.genreName),
-                const SizedBox(width: 14),
-                // Name + count
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.genreName,
-                        style: tt.bodyMedium
-                            ?.copyWith(color: ext.textPrimary),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        songLabel,
-                        style: tt.bodySmall
-                            ?.copyWith(color: ext.textSecondary),
-                      ),
-                    ],
-                  ),
+              _GenreIcon(genreName: widget.genreName),
+              const SizedBox(width: 14),
+              // Name + count
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.genreName,
+                      style: tt.bodyMedium
+                          ?.copyWith(color: ext.textPrimary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      songLabel,
+                      style: tt.bodySmall
+                          ?.copyWith(color: ext.textSecondary),
+                    ),
+                  ],
                 ),
-                Icon(
-                  LucideIcons.chevronRight,
-                  size: 16,
-                  color: ext.textTertiary,
-                ),
-              ],
-            ),
+              ),
+              Icon(
+                LucideIcons.chevronRight,
+                size: 16,
+                color: ext.textTertiary,
+              ),
+            ],
           ),
         ),
       ),

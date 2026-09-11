@@ -4,6 +4,7 @@ import 'dart:io' show File, Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../core/constants/app_constants.dart';
 import '../core/constants/app_enums.dart';
@@ -48,7 +49,8 @@ class MusicFseApp extends ConsumerStatefulWidget {
   ConsumerState<MusicFseApp> createState() => _MusicFseAppState();
 }
 
-class _MusicFseAppState extends ConsumerState<MusicFseApp> with WidgetsBindingObserver {
+class _MusicFseAppState extends ConsumerState<MusicFseApp>
+    with WidgetsBindingObserver, WindowListener {
   FileAssociationHandler? _fileAssociationHandler;
   Future<void> _pendingFileAssociationWork = Future<void>.value();
 
@@ -61,6 +63,9 @@ class _MusicFseAppState extends ConsumerState<MusicFseApp> with WidgetsBindingOb
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     HardwareKeyboard.instance.addHandler(_handleRawKeyForInputMode);
+    if (Platform.isWindows) {
+      windowManager.addListener(this);
+    }
 
     // Trigger lazy init of platform services after the first frame so that
     // BuildContext and Riverpod containers are fully ready.
@@ -71,6 +76,9 @@ class _MusicFseAppState extends ConsumerState<MusicFseApp> with WidgetsBindingOb
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_handleRawKeyForInputMode);
     WidgetsBinding.instance.removeObserver(this);
+    if (Platform.isWindows) {
+      windowManager.removeListener(this);
+    }
     final handler = _fileAssociationHandler;
     _fileAssociationHandler = null;
     if (handler != null) {
@@ -120,6 +128,20 @@ class _MusicFseAppState extends ConsumerState<MusicFseApp> with WidgetsBindingOb
   // App lifecycle → XInput polling
   // -------------------------------------------------------------------------
 
+  void _stopXInputPolling() {
+    suppressNextNavigateSound();
+    if (Platform.isWindows) {
+      ref.read(xInputControllerProvider.notifier).stop();
+    }
+  }
+
+  void _startXInputPolling() {
+    suppressNextNavigateSound();
+    if (Platform.isWindows) {
+      ref.read(xInputControllerProvider.notifier).start();
+    }
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
@@ -128,22 +150,34 @@ class _MusicFseAppState extends ConsumerState<MusicFseApp> with WidgetsBindingOb
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
       case AppLifecycleState.detached:
-        suppressNextNavigateSound();
-        // App is backgrounded — stop polling to save CPU for the game.
-        if (Platform.isWindows) {
-          ref.read(xInputControllerProvider.notifier).stop();
-        }
+        _stopXInputPolling();
       case AppLifecycleState.resumed:
-        suppressNextNavigateSound();
-        // App is in the foreground again — restart polling.
-        if (Platform.isWindows) {
-          ref.read(xInputControllerProvider.notifier).start();
-        }
+        _startXInputPolling();
       case AppLifecycleState.inactive:
         // Transitional state (e.g. app switcher visible) — keep polling.
         suppressNextNavigateSound();
         break;
     }
+  }
+
+  @override
+  void onWindowBlur() {
+    _stopXInputPolling();
+  }
+
+  @override
+  void onWindowFocus() {
+    _startXInputPolling();
+  }
+
+  @override
+  void onWindowMinimize() {
+    _stopXInputPolling();
+  }
+
+  @override
+  void onWindowRestore() {
+    _startXInputPolling();
   }
 
   // -------------------------------------------------------------------------
@@ -257,6 +291,7 @@ class _MusicFseAppState extends ConsumerState<MusicFseApp> with WidgetsBindingOb
 
           return AppSizes(
             tier: tier,
+            scale: themeState.uiScale,
             child: MaterialApp.router(
               title: AppConstants.appTitle,
               debugShowCheckedModeBanner: false,
@@ -264,11 +299,17 @@ class _MusicFseAppState extends ConsumerState<MusicFseApp> with WidgetsBindingOb
               // ── Theming ───────────────────────────────────────────────────────────
               theme: AppTheme.buildTheme(
                 accentColor: themeState.accentColor,
+                accentTextColor: themeState.accentTextColor,
+                appFont: themeState.appFont,
                 brightness: Brightness.light,
+                uiScale: themeState.uiScale,
               ),
               darkTheme: AppTheme.buildTheme(
                 accentColor: themeState.accentColor,
+                accentTextColor: themeState.accentTextColor,
+                appFont: themeState.appFont,
                 brightness: Brightness.dark,
+                uiScale: themeState.uiScale,
               ),
               themeMode: switch (themeState.mode) {
                 ThemeModeSetting.dark => ThemeMode.dark,

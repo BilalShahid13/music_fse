@@ -102,13 +102,7 @@ class XInputControllerNotifier extends _$XInputControllerNotifier {
       ref.read(playbackProvider.notifier).skipNext();
     };
 
-    // LT/RT: GamepadInputHandler already scales to ±0.05 per poll tick.
-    handler.onVolumeChange = (double scaledDelta) {
-      final current = ref.read(playbackProvider).volume;
-      ref.read(playbackProvider.notifier).setVolume(current + scaledDelta);
-    };
-
-    // Right stick X: GamepadInputHandler emits ±10 s at full deflection.
+    // Right stick X: GamepadInputHandler emits ±5 s at full deflection.
     handler.onSeekRelative = (double seconds) {
       final ps = ref.read(playbackProvider);
       if (ps.duration == Duration.zero) return;

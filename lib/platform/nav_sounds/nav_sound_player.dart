@@ -6,6 +6,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/utils/logger.dart';
 
 // ---------------------------------------------------------------------------
@@ -63,7 +64,10 @@ final class NavSoundPlayer {
 
   final Map<NavSoundType, AudioPlayer> _players = <NavSoundType, AudioPlayer>{};
   final Map<NavSoundType, String> _resolvedPaths = <NavSoundType, String>{};
-  double _volume = 1.0;
+  final Map<NavSoundType, Future<void>> _playOperations =
+      <NavSoundType, Future<void>>{};
+  final Map<NavSoundType, bool> _restartRequested = <NavSoundType, bool>{};
+  double _volume = AppConstants.defaultNavSoundLevel;
   bool _suppressed = false;
   bool _initialized = false;
   Future<void>? _initializing;
@@ -107,6 +111,16 @@ final class NavSoundPlayer {
     }
 
     _initialized = _players.isNotEmpty;
+
+    if (_initialized) {
+      for (final player in _players.values) {
+        await _runPlayerCommand(
+          player.setVolume(_volume),
+          action: 'setVolume',
+          resetOnStaleChannel: true,
+        );
+      }
+    }
 
     if (_initialized) {
       AppLogger.debug(
@@ -166,7 +180,11 @@ final class NavSoundPlayer {
   void setVolume(double volume) {
     _volume = volume.clamp(0.0, 1.0);
     for (final player in _players.values) {
-      unawaited(player.setVolume(_volume));
+      _dispatchPlayerCommand(
+        player.setVolume(_volume),
+        action: 'setVolume',
+        resetOnStaleChannel: true,
+      );
     }
   }
 
@@ -177,8 +195,14 @@ final class NavSoundPlayer {
 
     if (!suppressed) return;
 
+    _restartRequested.clear();
+
     for (final player in _players.values) {
-      unawaited(player.stop());
+      _dispatchPlayerCommand(
+        player.stop(),
+        action: 'stop',
+        resetOnStaleChannel: true,
+      );
     }
   }
 
@@ -192,11 +216,31 @@ final class NavSoundPlayer {
   /// does not throw on errors. If the volume is 0.0 the call is a no-op.
   void play(NavSoundType type) {
     if (_suppressed || _volume < 0.001) return;
-    _playSoundAsync(type);
+    _schedulePlay(type);
   }
 
-  void _playSoundAsync(NavSoundType type) {
-    unawaited(_playSound(type));
+  void _schedulePlay(NavSoundType type) {
+    final inFlight = _playOperations[type];
+    if (inFlight != null) {
+      _restartRequested[type] = true;
+      return;
+    }
+
+    final operation = _drainPlayRequests(type);
+    _playOperations[type] = operation;
+    unawaited(operation.whenComplete(() {
+      if (identical(_playOperations[type], operation)) {
+        _playOperations.remove(type);
+      }
+    }));
+  }
+
+  Future<void> _drainPlayRequests(NavSoundType type) async {
+    do {
+      _restartRequested[type] = false;
+      await _playSound(type);
+    } while (_restartRequested[type] == true && !_suppressed && _volume >= 0.001);
+    _restartRequested.remove(type);
   }
 
   Future<void> _playSound(NavSoundType type) async {
@@ -212,6 +256,7 @@ final class NavSoundPlayer {
     if (player == null || !_initialized) return;
 
     try {
+      await player.setVolume(_volume);
       await player.stop();
       await player.seek(Duration.zero);
       await player.play();
@@ -222,6 +267,69 @@ final class NavSoundPlayer {
         'NavSoundPlayer: failed to play $type — ${e.runtimeType}',
         tag: 'NavSoundPlayer',
       );
+      if (_isStaleChannelError(e)) {
+        await _resetPlayers();
+      }
+    }
+  }
+
+  void _dispatchPlayerCommand(
+    Future<void> operation, {
+    required String action,
+    bool resetOnStaleChannel = false,
+  }) {
+    unawaited(
+      _runPlayerCommand(
+        operation,
+        action: action,
+        resetOnStaleChannel: resetOnStaleChannel,
+      ),
+    );
+  }
+
+  Future<void> _runPlayerCommand(
+    Future<void> operation, {
+    required String action,
+    bool resetOnStaleChannel = false,
+  }) async {
+    try {
+      await operation;
+    } catch (e) {
+      AppLogger.debug(
+        'NavSoundPlayer: $action failed — ${e.runtimeType}',
+        tag: 'NavSoundPlayer',
+      );
+      if (resetOnStaleChannel && _isStaleChannelError(e)) {
+        await _resetPlayers();
+      }
+    }
+  }
+
+  bool _isStaleChannelError(Object error) {
+    if (error is MissingPluginException) {
+      return true;
+    }
+    if (error is PlatformException) {
+      final message = error.message ?? '';
+      return message.contains('No implementation found for method');
+    }
+    return false;
+  }
+
+  Future<void> _resetPlayers() async {
+    final players = List<AudioPlayer>.from(_players.values);
+    _players.clear();
+    _playOperations.clear();
+    _restartRequested.clear();
+    _initialized = false;
+    _initializing = null;
+
+    for (final player in players) {
+      try {
+        await player.dispose();
+      } catch (_) {
+        // Best-effort only. Stale channels are expected here.
+      }
     }
   }
 

@@ -63,7 +63,7 @@ final class FavoritesNotifierProvider
   }
 }
 
-String _$favoritesNotifierHash() => r'73fe8d2978f14c61cb7da4e633bc9741c1b25a5f';
+String _$favoritesNotifierHash() => r'f519b5ff4878b536ec95f3aabde548458e3e09fc';
 
 /// All songs marked as favorites, optionally sorted.
 ///

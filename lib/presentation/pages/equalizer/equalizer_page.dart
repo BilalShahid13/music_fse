@@ -7,10 +7,13 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/localization/generated/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../helpers/active_focus_request.dart';
 import '../../providers/eq_provider.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/focus_highlight.dart';
+import '../../widgets/focus_hint_registry.dart';
 import '../../widgets/gamepad_button_hints.dart';
+import '../../widgets/header_sort_dropdown.dart';
 import '../dialogs/text_input_dialog.dart';
 
 /// Equalizer page with 10 vertical band sliders.
@@ -39,10 +42,9 @@ class _EqualizerPageState extends ConsumerState<EqualizerPage> {
     super.initState();
     _enableToggleFocus = FocusNode(debugLabel: 'EQ-enable');
     _presetFocus = FocusNode(debugLabel: 'EQ-preset');
-    _keyListenerFocusNode = FocusNode(debugLabel: 'EqualizerPage-keyListener')..skipTraversal = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _enableToggleFocus.requestFocus();
-    });
+    _keyListenerFocusNode = FocusNode(debugLabel: 'EqualizerPage-keyListener')
+      ..skipTraversal = true;
+    scheduleActiveFocusRequest(state: this, focusNode: _enableToggleFocus);
   }
 
   @override
@@ -70,6 +72,22 @@ class _EqualizerPageState extends ConsumerState<EqualizerPage> {
     final currentIdx = presets.indexWhere((p) => p.id == eq.selectedPresetId);
     final nextIdx = (currentIdx + 1) % presets.length;
     ref.read(eqProvider.notifier).selectPreset(presets[nextIdx].id);
+  }
+
+  int? _focusedBandIndex(FocusHintCapabilities? focusedCaps) {
+    if (focusedCaps == null) return null;
+    for (var index = 0; index < _bandFocusNodes.length; index++) {
+      if (identical(focusedCaps.node, _bandFocusNodes[index])) {
+        return index;
+      }
+    }
+    return null;
+  }
+
+  void _adjustBand(EqState eq, int index, double delta) {
+    if (!eq.isEnabled || !eq.hasBands) return;
+    final nextValue = (eq.bands[index] + delta).clamp(-12.0, 12.0);
+    ref.read(eqProvider.notifier).setBandValue(index, nextValue);
   }
 
   KeyEventResult _handleKey(KeyEvent event, EqState eq) {
@@ -145,7 +163,8 @@ class _EqualizerPageState extends ConsumerState<EqualizerPage> {
                     _EnableToggle(
                       focusNode: _enableToggleFocus,
                       isEnabled: eq.isEnabled,
-                      onToggle: (v) => ref.read(eqProvider.notifier).toggleEq(enabled: v),
+                      onToggle: (v) =>
+                          ref.read(eqProvider.notifier).toggleEq(enabled: v),
                     ),
                   ],
                 ),
@@ -153,63 +172,80 @@ class _EqualizerPageState extends ConsumerState<EqualizerPage> {
 
               // ── Preset selector ────────────────────────────────────────
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: sizes.screenEdgePadding, vertical: 16),
+                padding: EdgeInsets.symmetric(
+                    horizontal: sizes.screenEdgePadding, vertical: 16),
                 child: Row(
                   children: [
                     // LB arrow
                     GestureDetector(
                       onTap: () => _cyclePrevPreset(eq),
-                      child: Icon(LucideIcons.chevronLeft, size: 20, color: ext.textSecondary),
+                      child: Icon(LucideIcons.chevronLeft,
+                          size: 20, color: ext.textSecondary),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: FocusHighlight(
+                      child: HeaderMenuButton<int>(
                         focusNode: _presetFocus,
-                        borderRadius: sizes.cardRadiusSm,
-                        onPressed: () {},
-                        child: PopupMenuButton<int>(
-                          onSelected: (id) => ref.read(eqProvider.notifier).selectPreset(id),
-                          color: ext.bgSurface,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: ext.bgCard,
-                              borderRadius: BorderRadius.circular(sizes.cardRadiusSm),
-                              border: Border.all(color: ext.borderCard),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(LucideIcons.slidersHorizontal, size: 16, color: ext.textSecondary),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    eq.selectedPreset?.name ?? l10n.eqCustom,
-                                    style: tt.bodyMedium?.copyWith(color: ext.textPrimary),
-                                  ),
-                                ),
-                                Icon(LucideIcons.chevronsUpDown, size: 14, color: ext.textTertiary),
-                              ],
-                            ),
-                          ),
-                          itemBuilder: (_) => eq.presets
-                              .map((p) => PopupMenuItem<int>(
-                                    value: p.id,
-                                    child: Row(
-                                      children: [
-                                        if (p.id == eq.selectedPresetId)
-                                          Icon(LucideIcons.check, size: 14, color: Theme.of(context).colorScheme.primary)
-                                        else
-                                          const SizedBox(width: 14),
-                                        const SizedBox(width: 8),
-                                        Text(p.name, style: tt.bodySmall?.copyWith(color: ext.textPrimary)),
-                                        if (p.isBuiltin) ...[
-                                          const Spacer(),
-                                          Text(l10n.eqBuiltIn, style: tt.labelSmall?.copyWith(color: ext.textTertiary)),
-                                        ],
+                        tooltip: 'Preset',
+                        onSelected: (id) =>
+                            ref.read(eqProvider.notifier).selectPreset(id),
+                        itemBuilder: (_) => eq.presets
+                            .map((preset) => PopupMenuItem<int>(
+                                  value: preset.id,
+                                  child: Row(
+                                    children: [
+                                      if (preset.id == eq.selectedPresetId)
+                                        Icon(
+                                          LucideIcons.check,
+                                          size: 14,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary,
+                                        )
+                                      else
+                                        const SizedBox(width: 14),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        preset.name,
+                                        style: tt.bodySmall
+                                            ?.copyWith(color: ext.textPrimary),
+                                      ),
+                                      if (preset.isBuiltin) ...[
+                                        const Spacer(),
+                                        Text(
+                                          l10n.eqBuiltIn,
+                                          style: tt.labelSmall?.copyWith(
+                                              color: ext.textTertiary),
+                                        ),
                                       ],
-                                    ),
-                                  ))
-                              .toList(),
+                                    ],
+                                  ),
+                                ))
+                            .toList(growable: false),
+                        child: Row(
+                          children: [
+                            Icon(
+                              LucideIcons.slidersHorizontal,
+                              size: 14,
+                              color: ext.textTertiary,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                eq.selectedPreset?.name ?? l10n.eqCustom,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: tt.bodySmall
+                                    ?.copyWith(color: ext.textSecondary),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              LucideIcons.chevronsUpDown,
+                              size: 14,
+                              color: ext.textTertiary,
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -217,7 +253,8 @@ class _EqualizerPageState extends ConsumerState<EqualizerPage> {
                     // RB arrow
                     GestureDetector(
                       onTap: () => _cycleNextPreset(eq),
-                      child: Icon(LucideIcons.chevronRight, size: 20, color: ext.textSecondary),
+                      child: Icon(LucideIcons.chevronRight,
+                          size: 20, color: ext.textSecondary),
                     ),
                   ],
                 ),
@@ -226,7 +263,8 @@ class _EqualizerPageState extends ConsumerState<EqualizerPage> {
               // ── Band sliders ───────────────────────────────────────────
               Expanded(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: sizes.screenEdgePadding),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: sizes.screenEdgePadding),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: List.generate(AppConstants.eqBandCount, (i) {
@@ -237,7 +275,10 @@ class _EqualizerPageState extends ConsumerState<EqualizerPage> {
                         label: AppConstants.eqBandLabels[i],
                         value: gain,
                         isEnabled: eq.isEnabled,
-                        onChanged: eq.isEnabled ? (v) => ref.read(eqProvider.notifier).setBandValue(i, v) : null,
+                        onChanged: eq.isEnabled
+                            ? (v) =>
+                                ref.read(eqProvider.notifier).setBandValue(i, v)
+                            : null,
                       );
                     }),
                   ),
@@ -261,19 +302,47 @@ class _EqualizerPageState extends ConsumerState<EqualizerPage> {
                     const SizedBox(width: 16),
                     _TextBtn(
                       label: l10n.eqReset,
-                      onTap: eq.selectedPresetId == null ? null : () => ref.read(eqProvider.notifier).selectPreset(eq.selectedPresetId!),
+                      onTap: eq.selectedPresetId == null
+                          ? null
+                          : () => ref
+                              .read(eqProvider.notifier)
+                              .selectPreset(eq.selectedPresetId!),
                     ),
                   ],
                 ),
               ),
 
               // ── Gamepad button hints ───────────────────────────────────
-              GamepadButtonHints(
-                aLabel: 'Select',
-                bLabel: 'Back',
-                lbLabel: 'Prev Preset',
-                rbLabel: 'Next Preset',
-                backgroundColor: ext.bgSurface,
+              ValueListenableBuilder<FocusHintCapabilities?>(
+                valueListenable: focusedHintCapabilities,
+                builder: (context, focusedCaps, _) {
+                  final focusedBandIndex = _focusedBandIndex(focusedCaps);
+                  final canSelect = focusedCaps?.supportsA == true;
+
+                  return GamepadButtonHints(
+                    aLabel: canSelect ? l10n.hintSelect : null,
+                    bLabel: l10n.hintBack,
+                    upLabel: focusedBandIndex != null && eq.isEnabled
+                        ? l10n.hintIncrease
+                        : null,
+                    downLabel: focusedBandIndex != null && eq.isEnabled
+                        ? l10n.hintDecrease
+                        : null,
+                    lbLabel: 'Prev Preset',
+                    rbLabel: 'Next Preset',
+                    onAPressed: canSelect ? focusedCaps?.onA : null,
+                    onBPressed: () => Navigator.of(context).maybePop(),
+                    onUpPressed: focusedBandIndex != null && eq.isEnabled
+                        ? () => _adjustBand(eq, focusedBandIndex, 0.5)
+                        : null,
+                    onDownPressed: focusedBandIndex != null && eq.isEnabled
+                        ? () => _adjustBand(eq, focusedBandIndex, -0.5)
+                        : null,
+                    onLbPressed: () => _cyclePrevPreset(eq),
+                    onRbPressed: () => _cycleNextPreset(eq),
+                    backgroundColor: ext.bgSurface,
+                  );
+                },
               ),
             ],
           ),
@@ -320,7 +389,8 @@ class _EnableToggle extends StatelessWidget {
         onTap: () => onToggle(!isEnabled),
         child: Row(
           children: [
-            Text(l10n.eqToggle, style: tt.bodyMedium?.copyWith(color: ext.textSecondary)),
+            Text(l10n.eqToggle,
+                style: tt.bodyMedium?.copyWith(color: ext.textSecondary)),
             const SizedBox(width: 8),
             Switch(
               value: isEnabled,
@@ -373,7 +443,9 @@ class _BandSliderState extends State<_BandSlider> {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
-    if (!widget.isEnabled || widget.onChanged == null) return KeyEventResult.ignored;
+    if (!widget.isEnabled || widget.onChanged == null) {
+      return KeyEventResult.ignored;
+    }
     if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
       widget.onChanged!((widget.value + _step).clamp(-12.0, 12.0));
       return KeyEventResult.handled;
@@ -421,9 +493,12 @@ class _BandSliderState extends State<_BandSlider> {
                     enabledThumbRadius: AppConstants.eqThumbSize / 2,
                   ),
                   thumbColor: widget.isEnabled ? cs.primary : ext.textTertiary,
-                  activeTrackColor: widget.isEnabled ? cs.primary.withOpacity(0.8) : ext.textTertiary,
+                  activeTrackColor: widget.isEnabled
+                      ? cs.primary.withValues(alpha: 0.8)
+                      : ext.textTertiary,
                   inactiveTrackColor: ext.borderSubtle,
-                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                  overlayShape:
+                      const RoundSliderOverlayShape(overlayRadius: 12),
                 ),
                 child: Slider(
                   value: widget.value.clamp(-12.0, 12.0),

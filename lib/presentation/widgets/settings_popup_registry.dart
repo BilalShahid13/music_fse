@@ -11,3 +11,9 @@ final ValueNotifier<bool> settingsColorPopupVisible = ValueNotifier<bool>(false)
 
 /// Dismiss action for the active settings accent color popup.
 final ValueNotifier<VoidCallback?> settingsColorPopupDismiss = ValueNotifier<VoidCallback?>(null);
+
+/// Tracks whether the settings app font popup is currently open.
+final ValueNotifier<bool> settingsFontPopupVisible = ValueNotifier<bool>(false);
+
+/// Dismiss action for the active settings app font popup.
+final ValueNotifier<VoidCallback?> settingsFontPopupDismiss = ValueNotifier<VoidCallback?>(null);

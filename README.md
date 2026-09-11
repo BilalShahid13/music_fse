@@ -1,10 +1,16 @@
 # music_fse
 
-A new Flutter project.
+A Flutter desktop music player for handheld gaming PCs.
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+Windows builds require these native toolchains:
+
+- Flutter SDK with Windows desktop support enabled
+- Visual Studio with the Desktop development with C++ workload
+- Rust via rustup, because `metadata_god` and `smtc_windows` build native code through CargoKit
+
+Install Rust from https://rustup.rs/ and restart your terminal before running `flutter build windows` or `flutter run -d windows`.
 
 A few resources to get you started if this is your first Flutter project:
 

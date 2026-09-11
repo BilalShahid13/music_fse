@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../core/constants/app_constants.dart';
@@ -21,24 +23,55 @@ part 'nav_sound_provider.g.dart';
 @Riverpod(keepAlive: true)
 NavSoundPlayer navSoundPlayer(Ref ref) {
   final player = NavSoundPlayer();
+  var navSoundsEnabled = AppConstants.defaultNavSoundEnabled;
+  var navSoundLevel = AppConstants.defaultNavSoundLevel;
+  var settingsHydrated = false;
+
+  void syncPlayerSettings() {
+    final isPlaying = ref.read(playbackProvider).isPlaying;
+    player.setSuppressed(!settingsHydrated || isPlaying || !navSoundsEnabled);
+  }
+
+  player.setVolume(navSoundLevel);
+  player.setSuppressed(true);
+  syncPlayerSettings();
 
   // Initialize asynchronously — NavSoundPlayer handles failures gracefully.
   player.initialize();
 
+  // Hydrate both settings together before unsuppressing so startup never
+  // falls back to the optimistic 100% default after restore.
+  unawaited(
+    Future.wait<dynamic>([
+      ref.read(navSoundEnabledProvider.future),
+      ref.read(navSoundLevelProvider.future),
+    ]).then((results) {
+      navSoundsEnabled = results[0] as bool;
+      navSoundLevel = results[1] as double;
+      settingsHydrated = true;
+      player.setVolume(navSoundLevel);
+      syncPlayerSettings();
+    }),
+  );
+
   // Keep volume in sync with the setting (re-runs when the setting changes).
   ref.listen(navSoundLevelProvider, (previous, next) {
-    final level = next.value ?? AppConstants.defaultNavSoundLevel;
+    final level = next.asData?.value;
+    if (level == null) return;
+    navSoundLevel = level;
     player.setVolume(level);
   });
 
-  ref.listen(playbackProvider, (previous, next) {
-    player.setSuppressed(next.isPlaying);
+  ref.listen(navSoundEnabledProvider, (previous, next) {
+    final enabled = next.asData?.value;
+    if (enabled == null) return;
+    navSoundsEnabled = enabled;
+    syncPlayerSettings();
   });
 
-  // Apply current volume immediately.
-  final currentLevel = ref.read(navSoundLevelProvider).value ?? AppConstants.defaultNavSoundLevel;
-  player.setVolume(currentLevel);
-  player.setSuppressed(ref.read(playbackProvider).isPlaying);
+  ref.listen(playbackProvider, (previous, next) {
+    syncPlayerSettings();
+  });
 
   ref.onDispose(player.dispose);
 

@@ -72,6 +72,9 @@ abstract class SongRepository {
 
   Future<Result<void>> deleteSong(int songId);
 
+  /// Deletes all songs from the library.
+  Future<Result<void>> clearAllSongs();
+
   /// Returns the total number of songs in the library.
   Future<Result<int>> getSongCount();
 

@@ -53,7 +53,7 @@ final class ThemeNotifierProvider
   }
 }
 
-String _$themeNotifierHash() => r'a56f686cce8b4e6f2a9607501ccde486def74045';
+String _$themeNotifierHash() => r'25f05f1638fb328d65e8e5d4686f8abcc081851f';
 
 /// Manages theme brightness and accent color.
 ///

@@ -136,6 +136,18 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get navSettings;
 
+  /// Navigation rail action: expand
+  ///
+  /// In en, this message translates to:
+  /// **'Expand'**
+  String get navExpand;
+
+  /// Navigation rail action: collapse
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse'**
+  String get navCollapse;
+
   /// Library tab: Songs
   ///
   /// In en, this message translates to:
@@ -1024,6 +1036,42 @@ abstract class AppLocalizations {
   /// **'Close'**
   String get hintClose;
 
+  /// Button hint: Move item up
+  ///
+  /// In en, this message translates to:
+  /// **'Move Up'**
+  String get hintMoveUp;
+
+  /// Button hint: Move item down
+  ///
+  /// In en, this message translates to:
+  /// **'Move Down'**
+  String get hintMoveDown;
+
+  /// Button hint: Increase volume
+  ///
+  /// In en, this message translates to:
+  /// **'Volume Up'**
+  String get hintVolumeUp;
+
+  /// Button hint: Decrease volume
+  ///
+  /// In en, this message translates to:
+  /// **'Volume Down'**
+  String get hintVolumeDown;
+
+  /// Button hint: Increase current value
+  ///
+  /// In en, this message translates to:
+  /// **'Increase'**
+  String get hintIncrease;
+
+  /// Button hint: Decrease current value
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease'**
+  String get hintDecrease;
+
   /// Button hint: Previous Track (LB)
   ///
   /// In en, this message translates to:
@@ -1201,7 +1249,7 @@ abstract class AppLocalizations {
   /// Title for save queue dialog
   ///
   /// In en, this message translates to:
-  /// **'Save Queue as Playlist'**
+  /// **'Save as Playlist'**
   String get queueSaveTitle;
 
   /// Hint text for save queue name field
@@ -1611,6 +1659,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Accent Color'**
   String get accentColor;
+
+  /// Color picker dialog label for accent foreground color
+  ///
+  /// In en, this message translates to:
+  /// **'Text Color'**
+  String get accentTextColor;
+
+  /// Color picker option for automatically selected accent foreground color
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get accentTextColorAuto;
 
   /// Color picker: custom hex input label
   ///

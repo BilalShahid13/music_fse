@@ -3,16 +3,20 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:just_audio/just_audio.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:riverpod/riverpod.dart' show ProviderListenableSelect;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/library_file_utils.dart';
 import '../../core/utils/logger.dart';
 import '../../domain/entities/play_history_entry.dart';
 import '../../domain/entities/playback_state.dart';
 import '../../domain/entities/queue_item.dart';
 import '../../domain/entities/song.dart';
 import '../../platform/media_keys/media_key_handler.dart';
+import 'repository_providers.dart';
 import 'scan_provider.dart';
 import 'settings_provider.dart';
 import 'toast_provider.dart';
@@ -71,6 +75,8 @@ class PlaybackNotifier extends _$PlaybackNotifier {
 
   Timer? _crossfadeTimer;
   Timer? _saveDebounceTimer;
+  int _loadRequestId = 0;
+  final Map<String, Future<String>> _playablePathTasks = <String, Future<String>>{};
 
   int _consecutiveMissCount = 0;
 
@@ -121,6 +127,7 @@ class PlaybackNotifier extends _$PlaybackNotifier {
   }
 
   Future<void> _restoreState() async {
+    final requestId = ++_loadRequestId;
     final shouldResume = (await ref.read(resumeOnLaunchProvider.future));
     if (!shouldResume) return;
 
@@ -140,16 +147,29 @@ class PlaybackNotifier extends _$PlaybackNotifier {
     if (_currentIndex < 0) _currentIndex = 0;
 
     final restoredSong = _queue[_currentIndex];
+    final restoredFilePath = normalizeLibraryFilePath(restoredSong.filePath);
+
+    if (!File(restoredFilePath).existsSync()) {
+      return;
+    }
 
     try {
-      await _playerA!.setAudioSource(
-        AudioSource.file(restoredSong.filePath),
-      );
+      final playablePath = await _resolvePlayablePath(restoredFilePath);
+      if (_isStaleLoadRequest(requestId)) return;
+
+      await _playerA!.setAudioSource(AudioSource.file(playablePath));
+      if (_isStaleLoadRequest(requestId)) return;
 
       final resumePos = savedQueue[_currentIndex].positionMs;
       if (resumePos > 0) {
         await _playerA!.seek(Duration(milliseconds: resumePos));
+        if (_isStaleLoadRequest(requestId)) return;
       }
+    } on PlayerInterruptedException {
+      if (_isStaleLoadRequest(requestId)) {
+        return;
+      }
+      return;
     } catch (e, st) {
       AppLogger.error(
         'PlaybackNotifier: restore failed',
@@ -159,6 +179,8 @@ class PlaybackNotifier extends _$PlaybackNotifier {
       );
       return;
     }
+
+    if (_isStaleLoadRequest(requestId)) return;
 
     state = state.copyWith(
       currentSong: restoredSong,
@@ -299,10 +321,12 @@ class PlaybackNotifier extends _$PlaybackNotifier {
 
   Future<void> _startCrossfade(int nextIndex) async {
     final nextSong = _queue[nextIndex];
+    final normalizedFilePath = normalizeLibraryFilePath(nextSong.filePath);
     _playerB = AudioPlayer();
 
     try {
-      await _playerB!.setAudioSource(AudioSource.file(nextSong.filePath));
+      final playablePath = await _resolvePlayablePath(normalizedFilePath);
+      await _playerB!.setAudioSource(AudioSource.file(playablePath));
       await _playerB!.setVolume(0.0);
       await _playerB!.play();
     } catch (e, st) {
@@ -548,11 +572,16 @@ class PlaybackNotifier extends _$PlaybackNotifier {
 
   /// Stops playback and empties the queue.
   Future<void> clearQueue() async {
+    _loadRequestId++;
+    _saveDebounceTimer?.cancel();
+    await _cancelPendingCrossfade();
     _queue.clear();
     _originalQueue.clear();
     _currentIndex = -1;
     await _playerA?.stop();
     state = PlaybackState.initial();
+    await ref.read(playbackRepositoryProvider).clearQueue();
+    await ref.read(savePlaybackStateProvider).call(state);
   }
 
   /// Re-runs the saved state restore (useful for the home screen resume card).
@@ -575,16 +604,24 @@ class PlaybackNotifier extends _$PlaybackNotifier {
   }) async {
     if (index < 0 || index >= _queue.length) return;
 
+    final requestId = ++_loadRequestId;
+    await _cancelPendingCrossfade();
+
     _currentIndex = index;
     _resetTrackAccounting();
 
     final song = _queue[index];
+    final normalizedFilePath = normalizeLibraryFilePath(song.filePath);
 
     // Pre-check: does the file exist?
-    if (!File(song.filePath).existsSync()) {
+    if (!File(normalizedFilePath).existsSync()) {
+      if (_isStaleLoadRequest(requestId)) return;
       await _handleMissingSong(song);
       return;
     }
+
+    final playablePath = await _resolvePlayablePath(normalizedFilePath);
+    if (_isStaleLoadRequest(requestId)) return;
 
     // Update state immediately so the mini player bar appears while the audio
     // engine loads the track. The _onPlayerState stream handler will flip
@@ -600,19 +637,47 @@ class PlaybackNotifier extends _$PlaybackNotifier {
 
     try {
       await _playerA?.stop();
-      await _playerA?.setAudioSource(AudioSource.file(song.filePath));
+      if (_isStaleLoadRequest(requestId)) return;
+
+      await _playerA?.setAudioSource(AudioSource.file(playablePath));
+      if (_isStaleLoadRequest(requestId)) return;
+
       await _playerA?.setVolume(state.isMuted ? 0.0 : state.volume);
+      if (_isStaleLoadRequest(requestId)) return;
+
       await _playerA?.play();
-    } on PlayerException catch (e) {
+      if (_isStaleLoadRequest(requestId)) return;
+    } on PlayerInterruptedException catch (e, st) {
+      if (_isStaleLoadRequest(requestId)) {
+        return;
+      }
       AppLogger.warn(
-        'Playback failed for ${song.filePath}: $e',
+        'PlaybackNotifier: load interrupted for $normalizedFilePath',
         tag: 'PlaybackNotifier',
+        error: e,
+        stackTrace: st,
       );
-      await _handleMissingSong(song);
+      state = state.copyWith(isPlaying: false);
+      return;
+    } on PlayerException catch (e, st) {
+      AppLogger.warn(
+        'Playback failed for $playablePath: $e',
+        tag: 'PlaybackNotifier',
+        error: e,
+        stackTrace: st,
+      );
+      ref.read(toastProvider.notifier).show(
+            'Playback failed: ${song.title}',
+            isError: true,
+          );
+      state = state.copyWith(isPlaying: false);
       return;
     } catch (e, st) {
+      if (_isStaleLoadRequest(requestId)) {
+        return;
+      }
       AppLogger.error(
-        'PlaybackNotifier: load failed for ${song.filePath}',
+        'PlaybackNotifier: load failed for $normalizedFilePath',
         tag: 'PlaybackNotifier',
         error: e,
         stackTrace: st,
@@ -680,6 +745,99 @@ class PlaybackNotifier extends _$PlaybackNotifier {
     if (_currentIndex > 0) return _currentIndex - 1;
     if (state.repeatMode == RepeatMode.all) return _queue.length - 1;
     return null;
+  }
+
+  bool _isStaleLoadRequest(int requestId) => requestId != _loadRequestId;
+
+  Future<String> _resolvePlayablePath(String normalizedFilePath) {
+    if (!_needsWindowsPlaybackMirror(normalizedFilePath)) {
+      return Future<String>.value(normalizedFilePath);
+    }
+
+    final existingTask = _playablePathTasks[normalizedFilePath];
+    if (existingTask != null) {
+      return existingTask;
+    }
+
+    final task = _preparePlayableMirror(normalizedFilePath);
+    _playablePathTasks[normalizedFilePath] = task;
+    return task.whenComplete(() {
+      if (identical(_playablePathTasks[normalizedFilePath], task)) {
+        _playablePathTasks.remove(normalizedFilePath);
+      }
+    });
+  }
+
+  bool _needsWindowsPlaybackMirror(String filePath) {
+    if (!Platform.isWindows) return false;
+    return filePath.runes.any((codePoint) => codePoint > 0x7F);
+  }
+
+  Future<String> _preparePlayableMirror(String normalizedFilePath) async {
+    final sourceFile = File(normalizedFilePath);
+    final sourceStat = await sourceFile.stat();
+    if (sourceStat.type == FileSystemEntityType.notFound) {
+      return normalizedFilePath;
+    }
+
+    try {
+      final supportDir = await getApplicationSupportDirectory();
+      final mirrorDir = Directory(p.join(supportDir.path, 'playback_cache'));
+      await mirrorDir.create(recursive: true);
+
+      final extension = p.extension(normalizedFilePath).toLowerCase();
+      final mirrorPath = p.join(
+        mirrorDir.path,
+        'track_${_stableHash(normalizedFilePath)}$extension',
+      );
+      final mirrorFile = File(mirrorPath);
+
+      final mirrorStat = await mirrorFile.stat();
+      final needsRefresh = mirrorStat.type == FileSystemEntityType.notFound ||
+          mirrorStat.size != sourceStat.size ||
+          mirrorStat.modified.isBefore(sourceStat.modified);
+
+      if (needsRefresh) {
+        if (await mirrorFile.exists()) {
+          await mirrorFile.delete();
+        }
+        await sourceFile.copy(mirrorPath);
+      }
+
+      return mirrorPath;
+    } catch (e, st) {
+      AppLogger.warn(
+        'PlaybackNotifier: failed to prepare playback mirror for $normalizedFilePath',
+        tag: 'PlaybackNotifier',
+        error: e,
+        stackTrace: st,
+      );
+      return normalizedFilePath;
+    }
+  }
+
+  String _stableHash(String input) {
+    const int fnvPrime = 0x01000193;
+    int hash = 0x811C9DC5;
+    for (final codeUnit in input.codeUnits) {
+      hash ^= codeUnit;
+      hash = (hash * fnvPrime) & 0xFFFFFFFF;
+    }
+    return hash.toRadixString(16).padLeft(8, '0');
+  }
+
+  Future<void> _cancelPendingCrossfade() async {
+    _crossfadeTimer?.cancel();
+    _crossfadeTimer = null;
+
+    final crossfadePlayer = _playerB;
+    _playerB = null;
+    if (crossfadePlayer == null) {
+      return;
+    }
+
+    await crossfadePlayer.stop();
+    await crossfadePlayer.dispose();
   }
 
   void _resetTrackAccounting() {

@@ -10,13 +10,25 @@ import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_enums.dart';
 import '../../../core/localization/generated/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/logger.dart';
+import '../../../platform/xinput/gamepad_scroll_target_mixin.dart';
+import '../../helpers/active_focus_request.dart';
 import '../../providers/scan_folder_provider.dart';
+import '../../providers/navigation_provider.dart';
 import '../../providers/scan_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/favorites_provider.dart';
+import '../../providers/home_provider.dart';
+import '../../providers/library_provider.dart';
+import '../../providers/playlist_provider.dart';
+import '../../providers/playback_provider.dart';
+import '../../providers/search_provider.dart';
+import '../../providers/use_case_providers.dart';
 import '../../widgets/focus_highlight.dart';
 import '../../widgets/settings_popup_registry.dart';
 import '../dialogs/color_picker_dialog.dart';
+import '../dialogs/confirm_dialog.dart';
 
 /// Settings page — 7 sections.
 ///
@@ -28,7 +40,8 @@ class SettingsPage extends ConsumerStatefulWidget {
   ConsumerState<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends ConsumerState<SettingsPage> {
+class _SettingsPageState extends ConsumerState<SettingsPage>
+    with GamepadScrollTargetMixin {
   late final FocusNode _defaultFocus;
   late final FocusNode _keyListenerFocusNode;
 
@@ -36,10 +49,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   void initState() {
     super.initState();
     _defaultFocus = FocusNode(debugLabel: 'Settings-default');
-    _keyListenerFocusNode = FocusNode(debugLabel: 'SettingsPage-keyListener')..skipTraversal = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _defaultFocus.requestFocus();
-    });
+    _keyListenerFocusNode = FocusNode(debugLabel: 'SettingsPage-keyListener')
+      ..skipTraversal = true;
+    scheduleActiveFocusRequest(state: this, focusNode: _defaultFocus);
   }
 
   @override
@@ -49,11 +61,54 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     super.dispose();
   }
 
+  Future<void> _resetLibrary() async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Reset Library',
+      message:
+          'This will remove all imported songs, playlists, queue, history, recommendations, and managed folders. The app will return to its initial onboarding state.',
+      confirmLabel: 'Reset Library',
+      isDangerous: true,
+    );
+    if (confirmed != true || !mounted) return;
+
+    await ref.read(playbackProvider.notifier).clearQueue();
+    final result = await ref.read(resetLibraryProvider).call();
+
+    result.when(
+      success: (_) {
+        ref.invalidate(scanFoldersProvider);
+        ref.invalidate(songsProvider);
+        ref.invalidate(albumsProvider);
+        ref.invalidate(artistsProvider);
+        ref.invalidate(genresProvider);
+        ref.invalidate(favoritesProvider);
+        ref.invalidate(recentlyPlayedProvider);
+        ref.invalidate(mostPlayedProvider);
+        ref.invalidate(recentlyAddedProvider);
+        ref.invalidate(libraryStatsProvider);
+        ref.invalidate(playlistsProvider);
+        ref.invalidate(recommendationsProvider);
+        ref.read(searchProvider.notifier).clearSearch();
+      },
+      failure: (error) => AppLogger.error(
+        'SettingsPage: reset library failed',
+        tag: 'SettingsPage',
+        error: error,
+      ),
+    );
+  }
+
   KeyEventResult _handleKey(KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    if (event.logicalKey == LogicalKeyboardKey.escape || event.logicalKey == LogicalKeyboardKey.gameButtonB) {
+    if (event.logicalKey == LogicalKeyboardKey.escape ||
+        event.logicalKey == LogicalKeyboardKey.gameButtonB) {
       if (settingsColorPopupVisible.value) {
         settingsColorPopupDismiss.value?.call();
+        return KeyEventResult.handled;
+      }
+      if (settingsFontPopupVisible.value) {
+        settingsFontPopupDismiss.value?.call();
         return KeyEventResult.handled;
       }
       if (settingsThemePopupVisible.value) {
@@ -81,10 +136,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final crossfadeAsync = ref.watch(crossfadeSecondsProvider);
     final gamepadAsync = ref.watch(gamepadEnabledProvider);
     final animateFocusScrollingAsync = ref.watch(animateFocusScrollingProvider);
+    final miniPlayerArtBackgroundAsync = ref.watch(
+      miniPlayerArtBackgroundProvider,
+    );
+    final navSoundEnabledAsync = ref.watch(navSoundEnabledProvider);
     final navSoundAsync = ref.watch(navSoundLevelProvider);
     final closeToTrayAsync = ref.watch(closeToTrayProvider);
     final startWithOsAsync = ref.watch(startWithOsProvider);
     final foldersAsync = ref.watch(scanFoldersProvider);
+    final currentRoute = ref.watch(navigationProvider);
+
+    syncGamepadScrollTarget(currentRoute == '/settings');
 
     return KeyboardListener(
       focusNode: _keyListenerFocusNode,
@@ -115,6 +177,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             // ── Scrollable body ───────────────────────────────────────────
             Expanded(
               child: ListView(
+                controller: gamepadScrollController,
                 padding: EdgeInsets.only(bottom: sizes.screenEdgePadding),
                 children: [
                   // ── 1. Appearance ───────────────────────────────────────
@@ -124,21 +187,41 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     tt: tt,
                     current: theme.mode,
                     defaultFocus: _defaultFocus,
-                    onChange: (m) => ref.read(themeProvider.notifier).setThemeMode(m),
+                    onChange: (m) =>
+                        ref.read(themeProvider.notifier).setThemeMode(m),
                   ),
                   _ColorRow(
                     ext: ext,
                     tt: tt,
                     accent: theme.accentColor,
                     onTap: () async {
-                      final picked = await showColorPickerDialog(
+                      final selection = await showColorPickerDialog(
                         context,
                         initial: theme.accentColor,
+                        initialTextColor: theme.accentTextColor,
                       );
-                      if (picked != null) {
-                        ref.read(themeProvider.notifier).setAccentColor(picked);
+                      if (selection != null) {
+                        final notifier = ref.read(themeProvider.notifier);
+                        await notifier.setAccentColor(selection.color);
+                        await notifier.setAccentTextColor(selection.textColor);
                       }
                     },
+                  ),
+                  _AppFontRow(
+                    ext: ext,
+                    tt: tt,
+                    current: theme.appFont,
+                    onChange: (value) =>
+                        ref.read(themeProvider.notifier).setAppFont(value),
+                  ),
+                  _BoolRow(
+                    ext: ext,
+                    tt: tt,
+                    label: 'Mini Player Art Background',
+                    value: miniPlayerArtBackgroundAsync.value ?? true,
+                    onChanged: (v) => ref
+                        .read(miniPlayerArtBackgroundProvider.notifier)
+                        .set(v),
                   ),
 
                   // ── 2. Library ──────────────────────────────────────────
@@ -153,7 +236,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     tt: tt,
                     label: 'Auto Scan',
                     value: autoScanAsync.value ?? true,
-                    onChanged: (v) => ref.read(autoScanProvider.notifier).set(v),
+                    onChanged: (v) =>
+                        ref.read(autoScanProvider.notifier).set(v),
                   ),
                   _ActionRow(
                     ext: ext,
@@ -162,6 +246,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     icon: LucideIcons.refreshCw,
                     onTap: () => ref.read(scanProvider.notifier).startScan(),
                   ),
+                  _ActionRow(
+                    ext: ext,
+                    tt: tt,
+                    label: 'Reset Library',
+                    icon: LucideIcons.trash2,
+                    onTap: _resetLibrary,
+                  ),
 
                   // ── 3. Playback ─────────────────────────────────────────
                   _SectionHeader(title: l10n.settingsPlayback),
@@ -169,21 +260,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     ext: ext,
                     tt: tt,
                     seconds: crossfadeAsync.value ?? 0,
-                    onChange: (v) => ref.read(crossfadeSecondsProvider.notifier).set(v),
+                    onChange: (v) =>
+                        ref.read(crossfadeSecondsProvider.notifier).set(v),
                   ),
                   _BoolRow(
                     ext: ext,
                     tt: tt,
                     label: 'Gapless Playback',
                     value: gaplessAsync.value ?? false,
-                    onChanged: (v) => ref.read(gaplessPlaybackProvider.notifier).set(v),
+                    onChanged: (v) =>
+                        ref.read(gaplessPlaybackProvider.notifier).set(v),
                   ),
                   _BoolRow(
                     ext: ext,
                     tt: tt,
                     label: 'Resume on Launch',
                     value: resumeAsync.value ?? true,
-                    onChanged: (v) => ref.read(resumeOnLaunchProvider.notifier).set(v),
+                    onChanged: (v) =>
+                        ref.read(resumeOnLaunchProvider.notifier).set(v),
                   ),
 
                   // ── 4. Equalizer link ───────────────────────────────────
@@ -203,21 +297,36 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     tt: tt,
                     label: 'Gamepad',
                     value: gamepadAsync.value ?? true,
-                    onChanged: (v) => ref.read(gamepadEnabledProvider.notifier).set(v),
+                    onChanged: (v) =>
+                        ref.read(gamepadEnabledProvider.notifier).set(v),
                   ),
                   _BoolRow(
                     ext: ext,
                     tt: tt,
                     label: l10n.settingsAnimateFocusScrolling,
                     value: animateFocusScrollingAsync.value ?? true,
-                    onChanged: (v) => ref.read(animateFocusScrollingProvider.notifier).set(v),
+                    onChanged: (v) =>
+                        ref.read(animateFocusScrollingProvider.notifier).set(v),
+                  ),
+                  _BoolRow(
+                    ext: ext,
+                    tt: tt,
+                    label: l10n.settingsNavigationSounds,
+                    value: navSoundEnabledAsync.value ??
+                        AppConstants.defaultNavSoundEnabled,
+                    onChanged: (v) =>
+                        ref.read(navSoundEnabledProvider.notifier).set(v),
                   ),
                   _SliderRow(
                     ext: ext,
                     tt: tt,
-                    label: l10n.settingsNavigationSounds,
-                    value: navSoundAsync.value ?? AppConstants.defaultNavSoundLevel,
-                    onChanged: (v) => ref.read(navSoundLevelProvider.notifier).set(v),
+                    label: 'Navigation Sound Volume',
+                    value: navSoundAsync.value ??
+                        AppConstants.defaultNavSoundLevel,
+                    enabled: navSoundEnabledAsync.value ??
+                        AppConstants.defaultNavSoundEnabled,
+                    onChanged: (v) =>
+                        ref.read(navSoundLevelProvider.notifier).set(v),
                   ),
                   _ActionRow(
                     ext: ext,
@@ -234,14 +343,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     tt: tt,
                     label: l10n.settingsCloseToTray,
                     value: closeToTrayAsync.value ?? true,
-                    onChanged: (v) => ref.read(closeToTrayProvider.notifier).set(v),
+                    onChanged: (v) =>
+                        ref.read(closeToTrayProvider.notifier).set(v),
                   ),
                   _BoolRow(
                     ext: ext,
                     tt: tt,
                     label: l10n.settingsStartWithSystem,
                     value: startWithOsAsync.value ?? false,
-                    onChanged: (v) => ref.read(startWithOsProvider.notifier).set(v),
+                    onChanged: (v) =>
+                        ref.read(startWithOsProvider.notifier).set(v),
                   ),
 
                   // ── 7. About ────────────────────────────────────────────
@@ -336,10 +447,13 @@ class _SettingsRowState extends State<_SettingsRow> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: Container(
-          constraints: const BoxConstraints(minHeight: AppConstants.listTileHeight),
-          padding: EdgeInsets.symmetric(horizontal: AppSizes.of(context).screenEdgePadding, vertical: 12),
+          constraints:
+              const BoxConstraints(minHeight: AppConstants.listTileHeight),
+          padding: EdgeInsets.symmetric(
+              horizontal: AppSizes.of(context).screenEdgePadding, vertical: 12),
           decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: ext.borderSubtle, width: 0.5)),
+            border:
+                Border(bottom: BorderSide(color: ext.borderSubtle, width: 0.5)),
           ),
           child: Row(
             children: [
@@ -348,8 +462,12 @@ class _SettingsRowState extends State<_SettingsRow> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(widget.label, style: tt.bodyMedium?.copyWith(color: ext.textPrimary)),
-                    if (widget.subtitle != null) Text(widget.subtitle!, style: tt.bodySmall?.copyWith(color: ext.textTertiary)),
+                    Text(widget.label,
+                        style: tt.bodyMedium?.copyWith(color: ext.textPrimary)),
+                    if (widget.subtitle != null)
+                      Text(widget.subtitle!,
+                          style:
+                              tt.bodySmall?.copyWith(color: ext.textTertiary)),
                   ],
                 ),
               ),
@@ -496,9 +614,12 @@ class _ThemeModeRowState extends State<_ThemeModeRow> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(labels[widget.current] ?? '', style: widget.tt.bodySmall?.copyWith(color: widget.ext.textSecondary)),
+          Text(labels[widget.current] ?? '',
+              style: widget.tt.bodySmall
+                  ?.copyWith(color: widget.ext.textSecondary)),
           const SizedBox(width: 4),
-          Icon(LucideIcons.chevronsUpDown, size: 14, color: widget.ext.textTertiary),
+          Icon(LucideIcons.chevronsUpDown,
+              size: 14, color: widget.ext.textTertiary),
         ],
       ),
     );
@@ -593,7 +714,8 @@ class _ThemeModeDialogState extends State<_ThemeModeDialog> {
                 Expanded(
                   child: Text(
                     labels[mode] ?? mode.name,
-                    style: widget.tt.bodyMedium?.copyWith(color: widget.ext.textPrimary),
+                    style: widget.tt.bodyMedium
+                        ?.copyWith(color: widget.ext.textPrimary),
                   ),
                 ),
                 if (isSelected)
@@ -611,25 +733,42 @@ class _ThemeModeDialogState extends State<_ThemeModeDialog> {
 
     return Focus(
       autofocus: true,
+      skipTraversal: true,
       onKeyEvent: _handleDialogKey,
-      child: AlertDialog(
-        backgroundColor: widget.ext.bgSurface,
-        title: Text(
-          'Theme',
-          style: widget.tt.titleMedium?.copyWith(color: widget.ext.textPrimary),
-        ),
-        contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        content: SizedBox(
-          width: 320,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              buildOption(mode: ThemeModeSetting.dark, node: _darkFocus),
-              const SizedBox(height: 6),
-              buildOption(mode: ThemeModeSetting.light, node: _lightFocus),
-              const SizedBox(height: 6),
-              buildOption(mode: ThemeModeSetting.system, node: _systemFocus),
-            ],
+      child: FocusTraversalGroup(
+        policy: OrderedTraversalPolicy(),
+        child: AlertDialog(
+          backgroundColor: widget.ext.bgSurface,
+          title: Text(
+            'Theme',
+            style:
+                widget.tt.titleMedium?.copyWith(color: widget.ext.textPrimary),
+          ),
+          contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          content: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FocusTraversalOrder(
+                  order: const NumericFocusOrder(0),
+                  child: buildOption(
+                      mode: ThemeModeSetting.dark, node: _darkFocus),
+                ),
+                const SizedBox(height: 6),
+                FocusTraversalOrder(
+                  order: const NumericFocusOrder(1),
+                  child: buildOption(
+                      mode: ThemeModeSetting.light, node: _lightFocus),
+                ),
+                const SizedBox(height: 6),
+                FocusTraversalOrder(
+                  order: const NumericFocusOrder(2),
+                  child: buildOption(
+                      mode: ThemeModeSetting.system, node: _systemFocus),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -643,12 +782,14 @@ class _SliderRow extends StatefulWidget {
     required this.tt,
     required this.label,
     required this.value,
+    required this.enabled,
     required this.onChanged,
   });
   final AppThemeExtension ext;
   final TextTheme tt;
   final String label;
   final double value;
+  final bool enabled;
   final void Function(double) onChanged;
 
   @override
@@ -669,6 +810,9 @@ class _SliderRowState extends State<_SliderRow> {
   }
 
   KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
+    if (!widget.enabled) {
+      return KeyEventResult.ignored;
+    }
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
@@ -689,6 +833,8 @@ class _SliderRowState extends State<_SliderRow> {
       ext: widget.ext,
       tt: widget.tt,
       label: widget.label,
+      subtitle:
+          widget.enabled ? '${(widget.value * 100).round()}%' : 'Disabled',
       onKeyEvent: _handleKey,
       trailing: SizedBox(
         width: 140,
@@ -696,8 +842,229 @@ class _SliderRowState extends State<_SliderRow> {
           value: widget.value,
           min: 0,
           max: 1,
-          onChanged: widget.onChanged,
+          onChanged: widget.enabled ? widget.onChanged : null,
           focusNode: _sliderFocus,
+        ),
+      ),
+    );
+  }
+}
+
+String _appFontLabel(AppFontSetting font) => switch (font) {
+      AppFontSetting.inter => 'Inter',
+      AppFontSetting.poppins => 'Poppins',
+      AppFontSetting.roboto => 'Roboto',
+      AppFontSetting.nunitoSans => 'Nunito Sans',
+    };
+
+class _AppFontRow extends StatefulWidget {
+  const _AppFontRow({
+    required this.ext,
+    required this.tt,
+    required this.current,
+    required this.onChange,
+  });
+
+  final AppThemeExtension ext;
+  final TextTheme tt;
+  final AppFontSetting current;
+  final void Function(AppFontSetting) onChange;
+
+  @override
+  State<_AppFontRow> createState() => _AppFontRowState();
+}
+
+class _AppFontRowState extends State<_AppFontRow> {
+  Future<void> _openMenu() async {
+    settingsFontPopupDismiss.value = _dismissMenu;
+    settingsFontPopupVisible.value = true;
+
+    AppFontSetting? selected;
+    try {
+      selected = await showDialog<AppFontSetting>(
+        context: context,
+        barrierDismissible: true,
+        traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
+        builder: (dialogContext) => _AppFontDialog(
+          ext: widget.ext,
+          tt: widget.tt,
+          current: widget.current,
+        ),
+      );
+    } finally {
+      _closeMenuState();
+    }
+
+    if (selected != null) {
+      widget.onChange(selected);
+    }
+  }
+
+  void _dismissMenu() {
+    Navigator.of(context, rootNavigator: true).maybePop();
+  }
+
+  void _closeMenuState() {
+    settingsFontPopupVisible.value = false;
+    if (identical(settingsFontPopupDismiss.value, _dismissMenu)) {
+      settingsFontPopupDismiss.value = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    if (settingsFontPopupVisible.value) {
+      _closeMenuState();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentLabel = _appFontLabel(widget.current);
+    return _SettingsRow(
+      ext: widget.ext,
+      tt: widget.tt,
+      label: 'App Font',
+      subtitle: currentLabel,
+      onTap: _openMenu,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(currentLabel,
+              style: widget.tt.bodySmall
+                  ?.copyWith(color: widget.ext.textSecondary)),
+          const SizedBox(width: 4),
+          Icon(LucideIcons.chevronsUpDown,
+              size: 14, color: widget.ext.textTertiary),
+        ],
+      ),
+    );
+  }
+}
+
+class _AppFontDialog extends StatefulWidget {
+  const _AppFontDialog({
+    required this.ext,
+    required this.tt,
+    required this.current,
+  });
+
+  final AppThemeExtension ext;
+  final TextTheme tt;
+  final AppFontSetting current;
+
+  @override
+  State<_AppFontDialog> createState() => _AppFontDialogState();
+}
+
+class _AppFontDialogState extends State<_AppFontDialog> {
+  late final Map<AppFontSetting, FocusNode> _focusNodes;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNodes = {
+      for (final font in AppFontSetting.values)
+        font: FocusNode(debugLabel: 'Settings-font-${font.name}'),
+    };
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _focusNodes[widget.current]?.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    for (final focusNode in _focusNodes.values) {
+      focusNode.dispose();
+    }
+    super.dispose();
+  }
+
+  KeyEventResult _handleDialogKey(FocusNode _, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.escape ||
+        event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+        event.logicalKey == LogicalKeyboardKey.keyB) {
+      Navigator.of(context).pop();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget buildOption(AppFontSetting font, int index) {
+      final isSelected = widget.current == font;
+      return FocusTraversalOrder(
+        order: NumericFocusOrder(index.toDouble()),
+        child: FocusHighlight(
+          focusNode: _focusNodes[font],
+          borderRadius: AppConstants.btnRadius,
+          onPressed: () => Navigator.of(context).pop(font),
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).pop(font),
+            child: Container(
+              height: AppConstants.listTileHeight,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppConstants.btnRadius),
+                color: isSelected ? widget.ext.bgInput : Colors.transparent,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _appFontLabel(font),
+                      style: widget.tt.bodyMedium
+                          ?.copyWith(color: widget.ext.textPrimary),
+                    ),
+                  ),
+                  if (isSelected)
+                    Icon(
+                      LucideIcons.check,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Focus(
+      autofocus: true,
+      skipTraversal: true,
+      onKeyEvent: _handleDialogKey,
+      child: FocusTraversalGroup(
+        policy: OrderedTraversalPolicy(),
+        child: AlertDialog(
+          backgroundColor: widget.ext.bgSurface,
+          title: Text(
+            'App Font',
+            style:
+                widget.tt.titleMedium?.copyWith(color: widget.ext.textPrimary),
+          ),
+          contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          content: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var index = 0;
+                    index < AppFontSetting.values.length;
+                    index++) ...[
+                  if (index > 0) const SizedBox(height: 6),
+                  buildOption(AppFontSetting.values[index], index),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -876,7 +1243,10 @@ class _AboutCard extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -893,7 +1263,8 @@ class _AboutCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: ext.bgInput,
                     borderRadius: BorderRadius.circular(999),

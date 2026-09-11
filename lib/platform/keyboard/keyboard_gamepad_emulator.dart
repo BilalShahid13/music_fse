@@ -38,31 +38,31 @@ class KeyboardGamepadEmulator extends StatelessWidget {
   /// For A and B we inject Enter / Escape instead because that's what
   /// [GamepadInputHandler] does and all widgets already handle those.
   static final _keyMap = <LogicalKeyboardKey, _EmulatedKey>{
-    LogicalKeyboardKey.keyA: _EmulatedKey(
+    LogicalKeyboardKey.keyA: const _EmulatedKey(
       LogicalKeyboardKey.enter,
       PhysicalKeyboardKey.enter,
     ),
-    LogicalKeyboardKey.keyB: _EmulatedKey(
+    LogicalKeyboardKey.keyB: const _EmulatedKey(
       LogicalKeyboardKey.escape,
       PhysicalKeyboardKey.escape,
     ),
-    LogicalKeyboardKey.keyX: _EmulatedKey(
+    LogicalKeyboardKey.keyX: const _EmulatedKey(
       LogicalKeyboardKey.gameButtonX,
       PhysicalKeyboardKey.gameButtonX,
     ),
-    LogicalKeyboardKey.keyY: _EmulatedKey(
+    LogicalKeyboardKey.keyY: const _EmulatedKey(
       LogicalKeyboardKey.gameButtonY,
       PhysicalKeyboardKey.gameButtonY,
     ),
-    LogicalKeyboardKey.keyQ: _EmulatedKey(
+    LogicalKeyboardKey.keyQ: const _EmulatedKey(
       LogicalKeyboardKey.gameButtonLeft1,
       PhysicalKeyboardKey.gameButtonLeft1,
     ),
-    LogicalKeyboardKey.keyE: _EmulatedKey(
+    LogicalKeyboardKey.keyE: const _EmulatedKey(
       LogicalKeyboardKey.gameButtonRight1,
       PhysicalKeyboardKey.gameButtonRight1,
     ),
-    LogicalKeyboardKey.keyP: _EmulatedKey(
+    LogicalKeyboardKey.keyP: const _EmulatedKey(
       LogicalKeyboardKey.gameButtonStart,
       PhysicalKeyboardKey.gameButtonStart,
     ),

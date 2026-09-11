@@ -21,6 +21,8 @@ import '../../core/utils/logger.dart';
 ///
 /// On non-Windows platforms every method is a safe no-op.
 final class SmtcBinding {
+  static Future<void>? _packageInitialization;
+
   SMTCWindows? _smtc;
 
   bool get isAvailable => Platform.isWindows && _smtc != null;
@@ -33,9 +35,12 @@ final class SmtcBinding {
   ///
   /// Must be called on the main isolate. Safe to await at app startup.
   Future<void> initialize() async {
-    if (!Platform.isWindows) return;
+    if (!Platform.isWindows || _smtc != null) return;
 
     try {
+      _packageInitialization ??= SMTCWindows.initialize();
+      await _packageInitialization;
+
       _smtc = SMTCWindows(
         config: const SMTCConfig(
           fastForwardEnabled: true,
@@ -49,6 +54,7 @@ final class SmtcBinding {
       );
       AppLogger.info('SMTC initialised', tag: 'SmtcBinding');
     } catch (e, st) {
+      _packageInitialization = null;
       AppLogger.error(
         'SmtcBinding: failed to initialise SMTC',
         tag: 'SmtcBinding',

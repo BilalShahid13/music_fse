@@ -12,7 +12,9 @@ import '../../../widgets/empty_state.dart';
 
 /// Artists tab — grid of artist cards.
 class ArtistsTab extends ConsumerWidget {
-  const ArtistsTab({super.key});
+  const ArtistsTab({super.key, this.scrollController});
+
+  final ScrollController? scrollController;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -40,6 +42,7 @@ class ArtistsTab extends ConsumerWidget {
           builder: (context, constraints) {
             final cols = (constraints.maxWidth / 180).floor().clamp(3, 8);
             return GridView.builder(
+              controller: scrollController,
               padding: EdgeInsets.all(sizes.screenEdgePadding),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: cols,

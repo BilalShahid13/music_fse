@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/constants/app_enums.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/localization/generated/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../widgets/focus_highlight.dart';
 import '../../widgets/settings_popup_registry.dart';
 
 /// Predefined accent color swatches available to the user.
@@ -39,22 +41,36 @@ const List<(String, Color)> kAccentColorOptions = [
 ///
 /// Usage:
 /// ```dart
-/// final color = await showColorPickerDialog(
+/// final selection = await showColorPickerDialog(
 ///   context,
 ///   initial: Theme.of(context).colorScheme.primary,
 /// );
-/// if (color != null) { /* apply */ }
+/// if (selection != null) { /* apply */ }
 /// ```
-Future<Color?> showColorPickerDialog(
+Future<AccentColorSelection?> showColorPickerDialog(
   BuildContext context, {
   required Color initial,
+  required AccentTextColorSetting initialTextColor,
 }) {
-  return showDialog<Color>(
+  return showDialog<AccentColorSelection>(
     context: context,
     barrierDismissible: true,
     traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
-    builder: (_) => _ColorPickerDialog(initial: initial),
+    builder: (_) => _ColorPickerDialog(
+      initial: initial,
+      initialTextColor: initialTextColor,
+    ),
   );
+}
+
+final class AccentColorSelection {
+  const AccentColorSelection({
+    required this.color,
+    required this.textColor,
+  });
+
+  final Color color;
+  final AccentTextColorSetting textColor;
 }
 
 // ---------------------------------------------------------------------------
@@ -62,8 +78,12 @@ Future<Color?> showColorPickerDialog(
 // ---------------------------------------------------------------------------
 
 class _ColorPickerDialog extends StatefulWidget {
-  const _ColorPickerDialog({required this.initial});
+  const _ColorPickerDialog({
+    required this.initial,
+    required this.initialTextColor,
+  });
   final Color initial;
+  final AccentTextColorSetting initialTextColor;
 
   @override
   State<_ColorPickerDialog> createState() => _ColorPickerDialogState();
@@ -71,8 +91,10 @@ class _ColorPickerDialog extends StatefulWidget {
 
 class _ColorPickerDialogState extends State<_ColorPickerDialog> {
   late Color _selected;
+  late AccentTextColorSetting _textColor;
   late final TextEditingController _hexController;
   late final List<FocusNode> _chipFocusNodes;
+  late final List<FocusNode> _textColorFocusNodes;
   late final FocusNode _hexFocus;
   late final FocusNode _cancelFocus;
   late final FocusNode _applyFocus;
@@ -82,10 +104,15 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
   void initState() {
     super.initState();
     _selected = widget.initial;
+    _textColor = widget.initialTextColor;
     _hexController = TextEditingController(text: _colorToHex(widget.initial));
     _chipFocusNodes = List<FocusNode>.generate(
       kAccentColorOptions.length,
       (index) => FocusNode(debugLabel: 'ColorPicker-chip-$index'),
+    );
+    _textColorFocusNodes = List<FocusNode>.generate(
+      AccentTextColorSetting.values.length,
+      (index) => FocusNode(debugLabel: 'ColorPicker-textColor-$index'),
     );
     _hexFocus = FocusNode(debugLabel: 'ColorPicker-hex');
     _cancelFocus = FocusNode(debugLabel: 'ColorPicker-cancel');
@@ -103,6 +130,9 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
     _closePopupState();
     _hexController.dispose();
     for (final node in _chipFocusNodes) {
+      node.dispose();
+    }
+    for (final node in _textColorFocusNodes) {
       node.dispose();
     }
     _hexFocus.dispose();
@@ -162,6 +192,14 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
     return KeyEventResult.ignored;
   }
 
+  void _focusHexNeighbors(TraversalDirection direction) {
+    if (direction == TraversalDirection.down) {
+      _textColorFocusNodes[_textColor.index].requestFocus();
+      return;
+    }
+    _focusSelectedChip();
+  }
+
   @override
   Widget build(BuildContext context) {
     final ext = context.appTheme;
@@ -169,6 +207,12 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
     final sizes = AppSizes.of(context);
     final accent = Theme.of(context).colorScheme.primary;
     final l10n = AppLocalizations.of(context)!;
+    final previewForeground = AppTheme.resolveOnAccentColor(_selected, _textColor);
+    final textColorOptions = [
+      (AccentTextColorSetting.auto, l10n.accentTextColorAuto),
+      (AccentTextColorSetting.dark, l10n.themeDark),
+      (AccentTextColorSetting.light, l10n.themeLight),
+    ];
 
     return Focus(
       autofocus: true,
@@ -237,40 +281,116 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                   const SizedBox(height: 16),
                   FocusTraversalOrder(
                     order: const NumericFocusOrder(100),
-                    child: TextField(
-                      controller: _hexController,
-                      focusNode: _hexFocus,
-                      maxLength: 7,
-                      style: tt.bodyMedium?.copyWith(
-                        color: ext.textPrimary,
-                        fontFamily: 'monospace',
+                    child: CallbackShortcuts(
+                      bindings: {
+                        const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
+                            _focusHexNeighbors(TraversalDirection.down),
+                        const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
+                            _focusHexNeighbors(TraversalDirection.up),
+                      },
+                      child: TextField(
+                        controller: _hexController,
+                        focusNode: _hexFocus,
+                        maxLength: 7,
+                        style: tt.bodyMedium?.copyWith(
+                          color: ext.textPrimary,
+                          fontFamily: 'monospace',
+                        ),
+                        onChanged: _onHexChanged,
+                        decoration: InputDecoration(
+                          labelText: l10n.customHex,
+                          labelStyle: tt.bodySmall?.copyWith(color: ext.textTertiary),
+                          errorText: _hexError,
+                          hintText: '#C76E00',
+                          counterText: '',
+                          filled: true,
+                          fillColor: ext.bgInput,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(sizes.cardRadiusSm),
+                            borderSide: BorderSide(color: ext.borderSubtle),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(sizes.cardRadiusSm),
+                            borderSide: BorderSide(color: ext.borderSubtle),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(sizes.cardRadiusSm),
+                            borderSide: BorderSide(color: accent, width: AppConstants.focusBorderWidth),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                        ),
                       ),
-                      onChanged: _onHexChanged,
-                      decoration: InputDecoration(
-                        labelText: l10n.customHex,
-                        labelStyle: tt.bodySmall?.copyWith(color: ext.textTertiary),
-                        errorText: _hexError,
-                        hintText: '#C76E00',
-                        counterText: '',
-                        filled: true,
-                        fillColor: ext.bgInput,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(sizes.cardRadiusSm),
-                          borderSide: BorderSide(color: ext.borderSubtle),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    l10n.accentTextColor,
+                    style: tt.titleSmall?.copyWith(color: ext.textPrimary),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: ext.bgInput,
+                      borderRadius: BorderRadius.circular(sizes.cardRadiusSm),
+                      border: Border.all(color: ext.borderSubtle),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: _selected,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Aa',
+                              style: tt.labelMedium?.copyWith(
+                                color: previewForeground,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(sizes.cardRadiusSm),
-                          borderSide: BorderSide(color: ext.borderSubtle),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            textColorOptions[_textColor.index].$2,
+                            style: tt.bodyMedium?.copyWith(color: ext.textSecondary),
+                          ),
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(sizes.cardRadiusSm),
-                          borderSide: BorderSide(color: accent, width: AppConstants.focusBorderWidth),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                      ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: List<Widget>.generate(
+                      textColorOptions.length,
+                      (index) {
+                        final option = textColorOptions[index];
+                        return Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(right: index == textColorOptions.length - 1 ? 0 : 8),
+                            child: FocusTraversalOrder(
+                              order: NumericFocusOrder(100.1 + index),
+                              child: _AccentTextColorOption(
+                                focusNode: _textColorFocusNodes[index],
+                                accentColor: _selected,
+                                mode: option.$1,
+                                label: option.$2,
+                                isSelected: _textColor == option.$1,
+                                onTap: () => setState(() => _textColor = option.$1),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -283,8 +403,6 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                           focusNode: _cancelFocus,
                           label: l10n.cancel,
                           isPrimary: false,
-                          ext: ext,
-                          tt: tt,
                           onPressed: () => Navigator.of(context).pop(),
                         ),
                       ),
@@ -295,10 +413,12 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                           focusNode: _applyFocus,
                           label: l10n.apply,
                           isPrimary: true,
-                          ext: ext,
-                          tt: tt,
-                          accent: accent,
-                          onPressed: () => Navigator.of(context).pop(_selected),
+                          onPressed: () => Navigator.of(context).pop(
+                            AccentColorSelection(
+                              color: _selected,
+                              textColor: _textColor,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -317,7 +437,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
 // Color chip
 // ---------------------------------------------------------------------------
 
-class _ColorChip extends StatefulWidget {
+class _ColorChip extends StatelessWidget {
   const _ColorChip({
     required this.color,
     required this.label,
@@ -333,69 +453,110 @@ class _ColorChip extends StatefulWidget {
   final FocusNode? focusNode;
 
   @override
-  State<_ColorChip> createState() => _ColorChipState();
-}
-
-class _ColorChipState extends State<_ColorChip> {
-  late final FocusNode _focus;
-
-  KeyEventResult _handleKey(FocusNode _, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
-      return KeyEventResult.ignored;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.enter ||
-        event.logicalKey == LogicalKeyboardKey.space ||
-        event.logicalKey == LogicalKeyboardKey.gameButtonA) {
-      widget.onTap();
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _focus = widget.focusNode ?? FocusNode();
-  }
-
-  @override
-  void dispose() {
-    // Only dispose if we created the node (not passed in).
-    if (widget.focusNode == null) _focus.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
-    return Focus(
-      focusNode: _focus,
-      onKeyEvent: _handleKey,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: Tooltip(
-          message: widget.label,
+    return Tooltip(
+      message: label,
+      child: FocusHighlight(
+        focusNode: focusNode,
+        onPressed: onTap,
+        isCircular: true,
+        child: GestureDetector(
+          onTap: onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: AppConstants.focusTransitionMs),
             width: AppConstants.colorChipSize,
             height: AppConstants.colorChipSize,
             decoration: BoxDecoration(
-              color: widget.color,
+              color: color,
               shape: BoxShape.circle,
               border: Border.all(
-                color: _focus.hasFocus ? accent : (widget.isSelected ? Colors.white : Colors.transparent),
-                width: widget.isSelected || _focus.hasFocus ? 2.5 : 0,
+                color: isSelected ? Colors.white : Colors.transparent,
+                width: isSelected ? 2.5 : 0,
               ),
-              boxShadow: _focus.hasFocus
-                  ? [
-                      BoxShadow(
-                        color: accent.withValues(alpha: 0.4),
-                        blurRadius: AppConstants.focusGlowBlur,
-                      ),
-                    ]
-                  : null,
             ),
-            child: widget.isSelected ? const Icon(LucideIcons.check, size: 16, color: Colors.white) : null,
+            child: isSelected
+                ? const Icon(LucideIcons.check, size: 16, color: Colors.white)
+                : null,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AccentTextColorOption extends StatelessWidget {
+  const _AccentTextColorOption({
+    required this.focusNode,
+    required this.accentColor,
+    required this.mode,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final FocusNode focusNode;
+  final Color accentColor;
+  final AccentTextColorSetting mode;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = context.appTheme;
+    final tt = Theme.of(context).textTheme;
+    const innerBorderRadius = AppConstants.btnRadius > AppConstants.focusBorderWidth
+        ? AppConstants.btnRadius - AppConstants.focusBorderWidth
+        : AppConstants.btnRadius;
+    const innerHeight = AppConstants.minFocusableSize - (AppConstants.focusBorderWidth * 2);
+    final borderColor = isSelected
+        ? Theme.of(context).colorScheme.primary
+        : ext.borderSubtle;
+    final previewForeground = AppTheme.resolveOnAccentColor(accentColor, mode);
+
+    return FocusHighlight(
+      focusNode: focusNode,
+      borderRadius: AppConstants.btnRadius,
+      padding: const EdgeInsets.all(AppConstants.focusBorderWidth),
+      onPressed: onTap,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: innerHeight,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: ext.bgInput,
+            borderRadius: BorderRadius.circular(innerBorderRadius),
+            border: Border.all(color: borderColor, width: isSelected ? 1.5 : 1),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 28,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: accentColor,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Center(
+                  child: Text(
+                    'Aa',
+                    style: tt.labelSmall?.copyWith(
+                      color: previewForeground,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
+                  style: tt.bodySmall?.copyWith(color: ext.textSecondary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -408,72 +569,28 @@ class _ColorDialogButton extends StatelessWidget {
     required this.focusNode,
     required this.label,
     required this.isPrimary,
-    required this.ext,
-    required this.tt,
     required this.onPressed,
-    this.accent,
   });
 
   final FocusNode focusNode;
   final String label;
   final bool isPrimary;
-  final AppThemeExtension ext;
-  final TextTheme tt;
   final VoidCallback onPressed;
-  final Color? accent;
-
-  KeyEventResult _handleKey(FocusNode _, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
-      return KeyEventResult.ignored;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.enter ||
-        event.logicalKey == LogicalKeyboardKey.space ||
-        event.logicalKey == LogicalKeyboardKey.gameButtonA) {
-      onPressed();
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
-  }
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
+    if (isPrimary) {
+      return FilledButton(
+        focusNode: focusNode,
+        onPressed: onPressed,
+        child: Text(label),
+      );
+    }
+
+    return OutlinedButton(
       focusNode: focusNode,
-      onKeyEvent: _handleKey,
-      child: Builder(
-        builder: (context) {
-          final hasFocus = focusNode.hasFocus;
-          final resolvedAccent = accent ?? Theme.of(context).colorScheme.primary;
-          return GestureDetector(
-            onTap: onPressed,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: AppConstants.focusTransitionMs),
-              curve: Curves.easeOut,
-              constraints: const BoxConstraints(
-                minWidth: 88,
-                minHeight: AppConstants.minFocusableSize,
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isPrimary ? resolvedAccent : Colors.transparent,
-                borderRadius: BorderRadius.circular(AppConstants.btnRadius),
-                border: Border.all(
-                  color: hasFocus ? resolvedAccent : (isPrimary ? Colors.transparent : ext.borderSubtle),
-                  width: hasFocus ? AppConstants.focusBorderWidth : 1,
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  label,
-                  style: tt.labelLarge?.copyWith(
-                    color: isPrimary ? Colors.white : ext.textSecondary,
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
+      onPressed: onPressed,
+      child: Text(label),
     );
   }
 }

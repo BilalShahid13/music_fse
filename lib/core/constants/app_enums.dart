@@ -18,3 +18,30 @@ enum ThemeModeSetting {
   /// Follow the host OS brightness preference.
   system,
 }
+
+/// Supported app-wide font families.
+enum AppFontSetting {
+  /// Default UI font.
+  inter,
+
+  /// Rounded geometric sans.
+  poppins,
+
+  /// System-style sans.
+  roboto,
+
+  /// Softer rounded sans.
+  nunitoSans,
+}
+
+/// Controls the foreground color used on top of the user-selected accent.
+enum AccentTextColorSetting {
+  /// Automatically choose the higher-contrast foreground for the accent.
+  auto,
+
+  /// Always use dark text/icons on accent surfaces.
+  dark,
+
+  /// Always use light text/icons on accent surfaces.
+  light,
+}

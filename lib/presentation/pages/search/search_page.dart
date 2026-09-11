@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,10 +12,14 @@ import '../../../core/localization/generated/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/entities/playback_state.dart';
 import '../../../domain/entities/song.dart';
+import '../../../platform/keyboard/on_screen_keyboard.dart';
+import '../../../platform/xinput/gamepad_scroll_target_mixin.dart';
 import '../../providers/favorites_provider.dart';
+import '../../providers/navigation_provider.dart';
 import '../../providers/playback_provider.dart';
 import '../../providers/toast_provider.dart';
 import '../../providers/search_provider.dart';
+import '../../helpers/active_focus_request.dart';
 import '../../helpers/add_to_playlist_helper.dart';
 import '../../widgets/album_card.dart';
 import '../../widgets/artist_card.dart';
@@ -34,33 +40,56 @@ class SearchPage extends ConsumerStatefulWidget {
   ConsumerState<SearchPage> createState() => _SearchPageState();
 }
 
-class _SearchPageState extends ConsumerState<SearchPage> {
+class _SearchPageState extends ConsumerState<SearchPage>
+    with GamepadScrollTargetMixin {
   late final FocusNode _inputFocus;
   late final TextEditingController _controller;
   late final FocusNode _keyListenerFocusNode;
+  Timer? _keyboardDismissDebounce;
 
   @override
   void initState() {
     super.initState();
     _inputFocus = FocusNode(debugLabel: 'Search-input');
+    _inputFocus.addListener(_handleInputFocusChanged);
     _controller = TextEditingController();
-    _keyListenerFocusNode = FocusNode(debugLabel: 'SearchPage-keyListener')..skipTraversal = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _inputFocus.requestFocus();
-    });
+    _keyListenerFocusNode = FocusNode(debugLabel: 'SearchPage-keyListener')
+      ..skipTraversal = true;
+    scheduleActiveFocusRequest(state: this, focusNode: _inputFocus);
   }
 
   @override
   void dispose() {
+    _keyboardDismissDebounce?.cancel();
+    _inputFocus.removeListener(_handleInputFocusChanged);
+    unawaited(OnScreenKeyboard.hide());
     _inputFocus.dispose();
     _controller.dispose();
     _keyListenerFocusNode.dispose();
     super.dispose();
   }
 
+  void _handleInputFocusChanged() {
+    if (!OnScreenKeyboard.isSupported) {
+      return;
+    }
+
+    _keyboardDismissDebounce?.cancel();
+    if (_inputFocus.hasFocus) {
+      unawaited(OnScreenKeyboard.show());
+      return;
+    }
+
+    _keyboardDismissDebounce = Timer(
+      const Duration(milliseconds: 150),
+      () => unawaited(OnScreenKeyboard.hide()),
+    );
+  }
+
   KeyEventResult _handleKey(KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    if (event.logicalKey == LogicalKeyboardKey.escape || event.logicalKey == LogicalKeyboardKey.gameButtonB) {
+    if (event.logicalKey == LogicalKeyboardKey.escape ||
+        event.logicalKey == LogicalKeyboardKey.gameButtonB) {
       if (_controller.text.isNotEmpty) {
         _controller.clear();
         ref.read(searchProvider.notifier).clearSearch();
@@ -83,6 +112,9 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     final currentSongId = ref.watch(
       playbackProvider.select((s) => s.currentSong?.id),
     );
+    final currentRoute = ref.watch(navigationProvider);
+
+    syncGamepadScrollTarget(currentRoute == '/search');
 
     return KeyboardListener(
       focusNode: _keyListenerFocusNode,
@@ -115,28 +147,36 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                     height: 48,
                     decoration: BoxDecoration(
                       color: ext.bgInput,
-                      borderRadius: BorderRadius.circular(AppConstants.btnRadius),
+                      borderRadius:
+                          BorderRadius.circular(AppConstants.btnRadius),
                       border: Border.all(color: ext.borderSubtle),
                     ),
                     child: Row(
                       children: [
                         const SizedBox(width: 14),
-                        Icon(LucideIcons.search, size: 18, color: ext.textTertiary),
+                        Icon(LucideIcons.search,
+                            size: 18, color: ext.textTertiary),
                         const SizedBox(width: 10),
                         Expanded(
                           child: TextField(
                             focusNode: _inputFocus,
                             controller: _controller,
-                            onChanged: (v) => ref.read(searchProvider.notifier).onQueryChanged(v),
+                            onChanged: (v) => ref
+                                .read(searchProvider.notifier)
+                                .onQueryChanged(v),
                             onSubmitted: (v) {
                               if (v.trim().isNotEmpty) {
-                                ref.read(searchProvider.notifier).addToHistory(v);
+                                ref
+                                    .read(searchProvider.notifier)
+                                    .addToHistory(v);
                               }
                             },
-                            style: tt.bodyMedium?.copyWith(color: ext.textPrimary),
+                            style:
+                                tt.bodyMedium?.copyWith(color: ext.textPrimary),
                             decoration: InputDecoration(
                               hintText: l10n.searchPlaceholder,
-                              hintStyle: tt.bodyMedium?.copyWith(color: ext.textTertiary),
+                              hintStyle: tt.bodyMedium
+                                  ?.copyWith(color: ext.textTertiary),
                               border: InputBorder.none,
                               isDense: true,
                             ),
@@ -151,7 +191,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                             },
                             child: Padding(
                               padding: const EdgeInsets.only(right: 12),
-                              child: Icon(LucideIcons.x, size: 16, color: ext.textTertiary),
+                              child: Icon(LucideIcons.x,
+                                  size: 16, color: ext.textTertiary),
                             ),
                           ),
                       ],
@@ -167,9 +208,11 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                   ? _SearchResults(
                       search: search,
                       currentSongId: currentSongId,
+                      scrollController: gamepadScrollController,
                     )
                   : _SearchHistory(
                       history: search.history,
+                      scrollController: gamepadScrollController,
                       onSelect: (q) {
                         _controller.text = q;
                         ref.read(searchProvider.notifier).onQueryChanged(q);
@@ -189,20 +232,33 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 // ---------------------------------------------------------------------------
 
 class _SearchResults extends ConsumerWidget {
-  const _SearchResults({required this.search, required this.currentSongId});
+  const _SearchResults({
+    required this.search,
+    required this.currentSongId,
+    required this.scrollController,
+  });
   final SearchState search;
   final int? currentSongId;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final results = search.results;
     final sizes = AppSizes.of(context);
 
-    if (search.isSearching && results.songs.isEmpty && results.albums.isEmpty && results.artists.isEmpty && results.playlists.isEmpty) {
+    if (search.isSearching &&
+        results.songs.isEmpty &&
+        results.albums.isEmpty &&
+        results.artists.isEmpty &&
+        results.playlists.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (!search.isSearching && results.songs.isEmpty && results.albums.isEmpty && results.artists.isEmpty && results.playlists.isEmpty) {
+    if (!search.isSearching &&
+        results.songs.isEmpty &&
+        results.albums.isEmpty &&
+        results.artists.isEmpty &&
+        results.playlists.isEmpty) {
       return const EmptyState(
         icon: LucideIcons.searchX,
         title: 'No Results',
@@ -211,23 +267,35 @@ class _SearchResults extends ConsumerWidget {
     }
 
     return ListView(
+      controller: scrollController,
       padding: const EdgeInsets.only(bottom: 24),
       children: [
         // Songs
         if (results.songs.isNotEmpty) ...[
           const _SectionHeader(title: 'Songs'),
-          ...results.songs.take(AppConstants.searchResultsPerCategory).toList().asMap().entries.map((entry) {
+          ...results.songs
+              .take(AppConstants.searchResultsPerCategory)
+              .toList()
+              .asMap()
+              .entries
+              .map((entry) {
             final i = entry.key;
             final song = entry.value;
-            final songs = results.songs.take(AppConstants.searchResultsPerCategory).toList();
+            final songs = results.songs
+                .take(AppConstants.searchResultsPerCategory)
+                .toList();
             return SongListTile(
               key: ValueKey(song.id),
               song: song,
               isCurrentlyPlaying: song.id == currentSongId,
               isFavorite: song.isFavorite,
-              onTap: () => ref.read(playbackProvider.notifier).playSong(song, queue: songs, index: i, sourceType: QueueSourceType.search),
-              onContextMenu: () => _showSongContextMenu(context, ref, song, songs, i),
-              onToggleFavorite: () => ref.read(favoritesProvider().notifier).toggleFavorite(song.id, isFavorite: song.isFavorite),
+              onTap: () => ref.read(playbackProvider.notifier).playSong(song,
+                  queue: songs, index: i, sourceType: QueueSourceType.search),
+              onContextMenu: () =>
+                  _showSongContextMenu(context, ref, song, songs, i),
+              onToggleFavorite: () => ref
+                  .read(favoritesProvider().notifier)
+                  .toggleFavorite(song.id, isFavorite: song.isFavorite),
             );
           }),
         ],
@@ -239,8 +307,11 @@ class _SearchResults extends ConsumerWidget {
             height: sizes.gridCardHeight + 16,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: sizes.screenEdgePadding),
-              itemCount: results.albums.take(AppConstants.searchResultsPerCategory).length,
+              padding:
+                  EdgeInsets.symmetric(horizontal: sizes.screenEdgePadding),
+              itemCount: results.albums
+                  .take(AppConstants.searchResultsPerCategory)
+                  .length,
               itemBuilder: (ctx, i) {
                 final album = results.albums[i];
                 return Padding(
@@ -266,8 +337,11 @@ class _SearchResults extends ConsumerWidget {
             height: sizes.gridCardHeight + 16,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: sizes.screenEdgePadding),
-              itemCount: results.artists.take(AppConstants.searchResultsPerCategory).length,
+              padding:
+                  EdgeInsets.symmetric(horizontal: sizes.screenEdgePadding),
+              itemCount: results.artists
+                  .take(AppConstants.searchResultsPerCategory)
+                  .length,
               itemBuilder: (ctx, i) {
                 final artist = results.artists[i];
                 return Padding(
@@ -306,7 +380,8 @@ class _SearchResults extends ConsumerWidget {
         ContextMenuItem(
           label: l10n.ctxPlay,
           icon: LucideIcons.play,
-          onTap: () => ref.read(playbackProvider.notifier).playSong(song, queue: songs, index: index, sourceType: QueueSourceType.search),
+          onTap: () => ref.read(playbackProvider.notifier).playSong(song,
+              queue: songs, index: index, sourceType: QueueSourceType.search),
         ),
         ContextMenuItem(
           label: l10n.ctxAddToQueue,
@@ -323,9 +398,13 @@ class _SearchResults extends ConsumerWidget {
         ),
         const ContextMenuSeparator(),
         ContextMenuItem(
-          label: song.isFavorite ? l10n.ctxRemoveFromFavorites : l10n.ctxAddToFavorites,
+          label: song.isFavorite
+              ? l10n.ctxRemoveFromFavorites
+              : l10n.ctxAddToFavorites,
           icon: song.isFavorite ? LucideIcons.heartOff : LucideIcons.heart,
-          onTap: () => ref.read(favoritesProvider().notifier).toggleFavorite(song.id, isFavorite: song.isFavorite),
+          onTap: () => ref
+              .read(favoritesProvider().notifier)
+              .toggleFavorite(song.id, isFavorite: song.isFavorite),
         ),
       ],
     );
@@ -337,9 +416,14 @@ class _SearchResults extends ConsumerWidget {
 // ---------------------------------------------------------------------------
 
 class _SearchHistory extends StatelessWidget {
-  const _SearchHistory({required this.history, required this.onSelect});
+  const _SearchHistory({
+    required this.history,
+    required this.onSelect,
+    required this.scrollController,
+  });
   final List<String> history;
   final void Function(String) onSelect;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
@@ -352,6 +436,7 @@ class _SearchHistory extends StatelessWidget {
     }
 
     return ListView.builder(
+      controller: scrollController,
       padding: EdgeInsets.zero,
       itemCount: history.length,
       itemBuilder: (ctx, i) {
@@ -414,7 +499,8 @@ class _HistoryItemState extends State<_HistoryItem> {
                     style: tt.bodyMedium?.copyWith(color: ext.textSecondary),
                   ),
                 ),
-                Icon(LucideIcons.arrowUpLeft, size: 14, color: ext.textTertiary),
+                Icon(LucideIcons.arrowUpLeft,
+                    size: 14, color: ext.textTertiary),
               ],
             ),
           ),

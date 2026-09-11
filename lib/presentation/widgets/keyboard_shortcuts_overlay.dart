@@ -80,7 +80,9 @@ class _KeyboardShortcutsOverlayState extends State<KeyboardShortcutsOverlay> wit
       focusNode: _keyListenerFocusNode,
       onKeyEvent: (event) {
         if (event is! KeyDownEvent) return;
-        if (event.logicalKey == LogicalKeyboardKey.escape || event.logicalKey == LogicalKeyboardKey.gameButtonB) {
+        if (event.logicalKey == LogicalKeyboardKey.escape ||
+            event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+            event.logicalKey == LogicalKeyboardKey.keyB) {
           _dismiss();
         }
       },
@@ -89,7 +91,7 @@ class _KeyboardShortcutsOverlayState extends State<KeyboardShortcutsOverlay> wit
         child: GestureDetector(
           onTap: _dismiss,
           child: Container(
-            color: Colors.black.withOpacity(0.75),
+            color: Colors.black.withValues(alpha: 0.75),
             alignment: Alignment.center,
             child: ScaleTransition(
               scale: _scale,

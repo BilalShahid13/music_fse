@@ -129,7 +129,6 @@ class _ToastCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final ext = context.appTheme;
     final tt = Theme.of(context).textTheme;
-    final accent = Theme.of(context).colorScheme.primary;
     final sizes = AppSizes.of(context);
     final textColor =
         data.isError ? ext.destructive : ext.textPrimary;
@@ -166,15 +165,7 @@ class _ToastCard extends StatelessWidget {
               const SizedBox(width: 12),
               TextButton(
                 onPressed: data.undoAction,
-                style: TextButton.styleFrom(
-                  foregroundColor: accent,
-                  minimumSize: const Size(48, 36),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                ),
-                child: Text(
-                  data.undoLabel ?? 'Undo',
-                  style: tt.labelMedium?.copyWith(color: accent),
-                ),
+                child: Text(data.undoLabel ?? 'Undo'),
               ),
             ],
           ],

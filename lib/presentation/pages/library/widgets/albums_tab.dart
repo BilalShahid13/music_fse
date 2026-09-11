@@ -14,7 +14,9 @@ import '../../../widgets/empty_state.dart';
 ///
 /// Column count: `(width / 180).floor().clamp(3, 8)`.
 class AlbumsTab extends ConsumerWidget {
-  const AlbumsTab({super.key});
+  const AlbumsTab({super.key, this.scrollController});
+
+  final ScrollController? scrollController;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -41,6 +43,7 @@ class AlbumsTab extends ConsumerWidget {
           builder: (context, constraints) {
             final cols = (constraints.maxWidth / 180).floor().clamp(3, 8);
             return GridView.builder(
+              controller: scrollController,
               padding: const EdgeInsets.all(AppConstants.screenEdgePadding),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: cols,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:desktop_drop/desktop_drop.dart';
@@ -8,18 +9,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/constants/app_sizes.dart';
 import '../../core/localization/generated/app_localizations.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/logger.dart';
+import '../../domain/repositories/settings_repository.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/multi_select_provider.dart';
 import '../providers/playback_provider.dart';
+import '../providers/repository_providers.dart';
 import '../providers/scan_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/toast_provider.dart';
 import 'library/library_folder_commands.dart';
 import 'library/library_selection_commands.dart';
 import 'library/library_tab_commands.dart';
+import 'queue/queue_drawer.dart';
 import '../widgets/custom_title_bar.dart';
 import '../widgets/context_menu.dart';
 import '../widgets/drop_overlay.dart';
@@ -64,7 +69,11 @@ class _ShellPageState extends ConsumerState<ShellPage> {
   late final FocusNode _contentFocus;
   late final FocusNode _miniPlayerFocus;
   late final FocusNode _shellFocusNode;
+  FocusNode? _queueDrawerReturnFocus;
   bool _isDragging = false;
+  bool _isWideNavRailExpanded = true;
+  bool _hasManualWideNavRailChoice = false;
+  bool _showQueueDrawer = false;
   String _lastFocusSnapshot = '';
 
   String _focusLabel(FocusNode? node) {
@@ -83,17 +92,39 @@ class _ShellPageState extends ConsumerState<ShellPage> {
     return 'route=${ref.read(navigationProvider)} nav=${_isFocusWithinScope(_navRailFocus)} content=${_isFocusWithinScope(_contentFocus)} mini=${_isFocusWithinScope(_miniPlayerFocus)} primary=${_focusLabel(primary)}';
   }
 
+  bool _isContextWithinSubtree(BuildContext context, BuildContext ancestor) {
+    if (identical(context, ancestor)) return true;
+
+    var found = false;
+    context.visitAncestorElements((element) {
+      if (identical(element, ancestor)) {
+        found = true;
+        return false;
+      }
+      return true;
+    });
+    return found;
+  }
+
+  bool _isNodeWithinScopeSubtree(FocusNode node, FocusNode scopeNode) {
+    final nodeContext = node.context;
+    final scopeContext = scopeNode.context;
+    if (nodeContext == null || scopeContext == null) return false;
+    return _isContextWithinSubtree(nodeContext, scopeContext);
+  }
+
   bool _isFocusWithinScope(FocusNode scopeNode) {
     final primary = FocusManager.instance.primaryFocus;
     if (primary == null) return false;
     if (identical(primary, scopeNode)) return true;
-    return scopeNode.descendants.contains(primary);
+    return _isNodeWithinScopeSubtree(primary, scopeNode);
   }
 
   void _requestRebuildSafely() {
     if (!mounted) return;
     final phase = SchedulerBinding.instance.schedulerPhase;
-    if (phase == SchedulerPhase.idle || phase == SchedulerPhase.postFrameCallbacks) {
+    if (phase == SchedulerPhase.idle ||
+        phase == SchedulerPhase.postFrameCallbacks) {
       setState(() {});
       return;
     }
@@ -113,14 +144,134 @@ class _ShellPageState extends ConsumerState<ShellPage> {
     node.requestFocus();
     if (node.context == null) return;
 
-    final animateFocusScrolling = ref.read(animateFocusScrollingProvider).value ?? true;
+    final animateFocusScrolling =
+        ref.read(animateFocusScrollingProvider).value ?? true;
     Scrollable.ensureVisible(
       node.context!,
       alignment: alignment ?? 1,
-      alignmentPolicy: alignmentPolicy ?? ScrollPositionAlignmentPolicy.explicit,
-      duration: animateFocusScrolling ? (duration ?? const Duration(milliseconds: AppConstants.focusScrollDurationMs)) : Duration.zero,
+      alignmentPolicy:
+          alignmentPolicy ?? ScrollPositionAlignmentPolicy.explicit,
+      duration: animateFocusScrolling
+          ? (duration ??
+              const Duration(milliseconds: AppConstants.focusScrollDurationMs))
+          : Duration.zero,
       curve: curve ?? Curves.easeOut,
     );
+  }
+
+  void _ensurePrimaryFocusVisible(TraversalDirection direction) {
+    final primary = FocusManager.instance.primaryFocus;
+    if (primary?.context == null) return;
+
+    final animateFocusScrolling =
+        ref.read(animateFocusScrollingProvider).value ?? true;
+    final alignmentPolicy = switch (direction) {
+      TraversalDirection.up ||
+      TraversalDirection.left =>
+        ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+      TraversalDirection.down ||
+      TraversalDirection.right =>
+        ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+    };
+
+    Scrollable.ensureVisible(
+      primary!.context!,
+      alignmentPolicy: alignmentPolicy,
+      duration: animateFocusScrolling
+          ? const Duration(milliseconds: AppConstants.focusScrollDurationMs)
+          : Duration.zero,
+      curve: Curves.easeOut,
+    );
+  }
+
+  void _requestManagedFocus(
+    FocusNode node, {
+    TraversalDirection? direction,
+    ScrollPositionAlignmentPolicy? alignmentPolicy,
+  }) {
+    final policy = alignmentPolicy ??
+        switch (direction) {
+          TraversalDirection.up ||
+          TraversalDirection.left =>
+            ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+          TraversalDirection.down ||
+          TraversalDirection.right =>
+            ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+          null => ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+        };
+
+    _requestTraversalFocus(node, alignmentPolicy: policy);
+  }
+
+  bool _moveWithinScope(FocusNode scopeNode, TraversalDirection direction) {
+    final previous = FocusManager.instance.primaryFocus;
+    if (previous == null) return false;
+
+    final moved = previous.focusInDirection(direction);
+    if (!moved) return false;
+
+    final next = FocusManager.instance.primaryFocus;
+    final stayedInScope = next != null &&
+        (identical(next, scopeNode) ||
+            _isNodeWithinScopeSubtree(next, scopeNode));
+    if (stayedInScope) {
+      _ensurePrimaryFocusVisible(direction);
+      return true;
+    }
+
+    if (previous.context != null && previous.canRequestFocus) {
+      previous.requestFocus();
+    }
+    return false;
+  }
+
+  bool _isOffstageForTraversal(BuildContext context) {
+    var isOffstage = false;
+    context.visitAncestorElements((element) {
+      final widget = element.widget;
+      if (widget is Offstage && widget.offstage) {
+        isOffstage = true;
+        return false;
+      }
+      return true;
+    });
+    return isOffstage;
+  }
+
+  bool _isTraversalCandidate(FocusNode node) {
+    if (!node.canRequestFocus ||
+        node.skipTraversal ||
+        node.context == null ||
+        node is FocusScopeNode) {
+      return false;
+    }
+
+    final context = node.context!;
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) {
+      return false;
+    }
+    if (_isOffstageForTraversal(context)) {
+      return false;
+    }
+
+    final renderObject = context.findRenderObject();
+    if (renderObject == null || !renderObject.attached) {
+      return false;
+    }
+    if (renderObject is RenderBox && !renderObject.hasSize) {
+      return false;
+    }
+
+    try {
+      final rect = node.rect;
+      return rect.left.isFinite &&
+          rect.top.isFinite &&
+          rect.right.isFinite &&
+          rect.bottom.isFinite;
+    } catch (_) {
+      return false;
+    }
   }
 
   void _onPrimaryFocusChanged() {
@@ -144,18 +295,98 @@ class _ShellPageState extends ConsumerState<ShellPage> {
     _requestRebuildSafely();
   }
 
+  void _openQueueDrawer() {
+    if (_showQueueDrawer) return;
+    _queueDrawerReturnFocus = FocusManager.instance.primaryFocus;
+    setState(() => _showQueueDrawer = true);
+  }
+
+  void _closeQueueDrawer({bool restoreFocus = true}) {
+    if (!_showQueueDrawer) return;
+    final returnFocus = _queueDrawerReturnFocus;
+    _queueDrawerReturnFocus = null;
+    setState(() => _showQueueDrawer = false);
+
+    if (!restoreFocus) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (returnFocus != null &&
+          returnFocus.context != null &&
+          returnFocus.canRequestFocus) {
+        _requestManagedFocus(returnFocus);
+        return;
+      }
+      if (_focusableDescendantsOf(_miniPlayerFocus).isNotEmpty) {
+        _focusTopmostInScope(_miniPlayerFocus);
+        return;
+      }
+      _focusTopmostInScope(_contentFocus);
+    });
+  }
+
+  void _openNowPlayingScreen() {
+    _closeQueueDrawer(restoreFocus: false);
+    context.push('/now-playing');
+  }
+
+  Future<void> _restoreWideNavRailPreference() async {
+    final result = await ref
+        .read(settingsRepositoryProvider)
+        .getBool(SettingsKeys.wideNavRailExpanded);
+
+    if (result.isFailure) {
+      AppLogger.error(
+        'ShellPage: failed to restore wide nav rail preference',
+        tag: 'ShellPage',
+        error: result.errorOrNull,
+      );
+      return;
+    }
+
+    final storedExpanded = result.valueOrNull;
+    if (!mounted ||
+        _hasManualWideNavRailChoice ||
+        storedExpanded == null ||
+        storedExpanded == _isWideNavRailExpanded) {
+      return;
+    }
+
+    setState(() => _isWideNavRailExpanded = storedExpanded);
+  }
+
+  Future<void> _persistWideNavRailPreference(bool expanded) async {
+    final result = await ref.read(settingsRepositoryProvider).setBool(
+          SettingsKeys.wideNavRailExpanded,
+          value: expanded,
+        );
+
+    if (result.isFailure) {
+      AppLogger.error(
+        'ShellPage: failed to persist wide nav rail preference',
+        tag: 'ShellPage',
+        error: result.errorOrNull,
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _navRailFocus = FocusNode(debugLabel: 'ShellPage-navRail');
     _contentFocus = FocusNode(debugLabel: 'ShellPage-content');
     _miniPlayerFocus = FocusNode(debugLabel: 'ShellPage-miniPlayer');
-    _shellFocusNode = FocusNode(debugLabel: 'ShellPage-shell')..skipTraversal = true;
+    _shellFocusNode = FocusNode(debugLabel: 'ShellPage-shell')
+      ..skipTraversal = true;
+
+    unawaited(_restoreWideNavRailPreference());
 
     // Ensure nav rail Home item has focus on first frame so the user sees a
     // focus ring immediately (console-like experience).
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (FocusManager.instance.primaryFocus == null || FocusManager.instance.primaryFocus == FocusManager.instance.rootScope) {
+      if (FocusManager.instance.primaryFocus == null ||
+          FocusManager.instance.primaryFocus ==
+              FocusManager.instance.rootScope) {
         // Focus the topmost nav rail item (Home) by Y position.
         _focusTopmostInScope(_navRailFocus);
       }
@@ -200,14 +431,17 @@ class _ShellPageState extends ConsumerState<ShellPage> {
     if (currentRoute == '/home') {
       final homeEntry = _preferredHomeEntryFocus();
       if (homeEntry != null) {
-        homeEntry.requestFocus();
+        _requestManagedFocus(homeEntry, direction: TraversalDirection.right);
         return;
       }
     }
     if (RegExp(r'^/playlists/\d+$').hasMatch(currentRoute)) {
       final playlistEntry = _preferredPlaylistDetailEntryFocus();
       if (playlistEntry != null) {
-        playlistEntry.requestFocus();
+        _requestManagedFocus(
+          playlistEntry,
+          direction: TraversalDirection.right,
+        );
         return;
       }
     }
@@ -233,13 +467,17 @@ class _ShellPageState extends ConsumerState<ShellPage> {
       try {
         final rect = node.rect;
         final dist = (rect.center.dy - navY).abs();
-        if ((dist - minDistance).abs() <= rowTolerance && rect.left < nearestX) {
+        if ((dist - minDistance).abs() <= rowTolerance &&
+            rect.left < nearestX) {
           nearestX = rect.left;
           nearest = node;
         }
       } catch (_) {}
     }
-    (nearest ?? contentItems.first).requestFocus();
+    _requestManagedFocus(
+      nearest ?? contentItems.first,
+      direction: TraversalDirection.right,
+    );
   }
 
   FocusNode? _preferredHomeEntryFocus() {
@@ -279,14 +517,21 @@ class _ShellPageState extends ConsumerState<ShellPage> {
         }
       } catch (_) {}
     }
-    (nearest ?? navItems.first).requestFocus();
+    _requestManagedFocus(
+      nearest ?? navItems.first,
+      direction: TraversalDirection.left,
+    );
   }
 
   /// Return the focusable descendants that are actual interactive widgets
   /// inside [scopeNode]. Excludes [FocusScopeNode]s (container scopes from
   /// Navigator, FocusScope, etc.) which should never receive direct focus.
   List<FocusNode> _focusableDescendantsOf(FocusNode scopeNode) {
-    return scopeNode.descendants.where((n) => n.canRequestFocus && !n.skipTraversal && n.context != null && n is! FocusScopeNode).toList();
+    return scopeNode.descendants
+        .where((node) =>
+            _isTraversalCandidate(node) &&
+            _isNodeWithinScopeSubtree(node, scopeNode))
+        .toList();
   }
 
   /// Find the focusable descendant in [scopeNode] whose vertical center is
@@ -298,7 +543,7 @@ class _ShellPageState extends ConsumerState<ShellPage> {
 
     final current = FocusManager.instance.primaryFocus;
     if (current == null || current.context == null) {
-      descendants.first.requestFocus();
+      _requestManagedFocus(descendants.first);
       return;
     }
 
@@ -323,14 +568,15 @@ class _ShellPageState extends ConsumerState<ShellPage> {
       try {
         final rect = node.rect;
         final dist = (rect.center.dy - currentCenterY).abs();
-        if ((dist - minDistance).abs() <= rowTolerance && rect.left < nearestX) {
+        if ((dist - minDistance).abs() <= rowTolerance &&
+            rect.left < nearestX) {
           nearestX = rect.left;
           nearest = node;
         }
       } catch (_) {}
     }
 
-    (nearest ?? descendants.first).requestFocus();
+    _requestManagedFocus(nearest ?? descendants.first);
   }
 
   /// Focus the topmost (smallest Y) focusable descendant in [scopeNode].
@@ -362,7 +608,7 @@ class _ShellPageState extends ConsumerState<ShellPage> {
       } catch (_) {}
     }
 
-    (topmost ?? descendants.first).requestFocus();
+    _requestManagedFocus(topmost ?? descendants.first);
   }
 
   /// Find the next focusable descendant below [current] inside [scopeNode]
@@ -423,7 +669,9 @@ class _ShellPageState extends ConsumerState<ShellPage> {
 
     // ── LB/RB = tab switch on /library, global prev/next elsewhere ──────
     final route = ref.read(navigationProvider);
-    if (route == '/library' && (key == LogicalKeyboardKey.gameButtonLeft1 || key == LogicalKeyboardKey.gameButtonRight1)) {
+    if (route == '/library' &&
+        (key == LogicalKeyboardKey.gameButtonLeft1 ||
+            key == LogicalKeyboardKey.gameButtonRight1)) {
       return KeyEventResult.ignored;
     }
 
@@ -441,15 +689,17 @@ class _ShellPageState extends ConsumerState<ShellPage> {
     if (isLeft) {
       if (_contentFocus.hasFocus) {
         // Try normal traversal within the content group first.
-        final moved = FocusManager.instance.primaryFocus?.focusInDirection(TraversalDirection.left) ?? false;
-        if (moved) return KeyEventResult.handled;
+        if (_moveWithinScope(_contentFocus, TraversalDirection.left)) {
+          return KeyEventResult.handled;
+        }
         _focusNavRailFromContent();
         return KeyEventResult.handled;
       }
       if (_miniPlayerFocus.hasFocus) {
         // Try within mini player first.
-        final moved = FocusManager.instance.primaryFocus?.focusInDirection(TraversalDirection.left) ?? false;
-        if (moved) return KeyEventResult.handled;
+        if (_moveWithinScope(_miniPlayerFocus, TraversalDirection.left)) {
+          return KeyEventResult.handled;
+        }
         _focusNavRail();
         return KeyEventResult.handled;
       }
@@ -463,8 +713,9 @@ class _ShellPageState extends ConsumerState<ShellPage> {
       }
       if (_miniPlayerFocus.hasFocus) {
         // Try to move right within the mini player controls row.
-        final moved = FocusManager.instance.primaryFocus?.focusInDirection(TraversalDirection.right) ?? false;
-        if (moved) return KeyEventResult.handled;
+        if (_moveWithinScope(_miniPlayerFocus, TraversalDirection.right)) {
+          return KeyEventResult.handled;
+        }
         // Already at the rightmost control — consume so focus never escapes
         // the mini player into the content area above.
         return KeyEventResult.handled;
@@ -478,12 +729,10 @@ class _ShellPageState extends ConsumerState<ShellPage> {
         tag: 'ShellFocus',
       );
       if (_contentFocus.hasFocus) {
-        final primary = FocusManager.instance.primaryFocus;
-        if (primary != null) {
+        if (FocusManager.instance.primaryFocus != null) {
           // Let Flutter's built-in directional focus handle movement
           // within the content area (it respects nested traversal groups).
-          final moved = primary.focusInDirection(TraversalDirection.down);
-          if (moved) {
+          if (_moveWithinScope(_contentFocus, TraversalDirection.down)) {
             AppLogger.debug(
               'Down moved within content to ${_focusLabel(FocusManager.instance.primaryFocus)}',
               tag: 'ShellFocus',
@@ -502,9 +751,15 @@ class _ShellPageState extends ConsumerState<ShellPage> {
         }
       }
       if (_miniPlayerFocus.hasFocus) {
-        // Move within mini player first (e.g. controls row -> seek row).
-        final moved = FocusManager.instance.primaryFocus?.focusInDirection(TraversalDirection.down) ?? false;
-        if (moved) {
+        final primary = FocusManager.instance.primaryFocus;
+        final below =
+            primary == null ? null : _nextBelow(_miniPlayerFocus, primary);
+        if (below != null) {
+          _requestManagedFocus(
+            below,
+            direction: TraversalDirection.down,
+          );
+          _ensurePrimaryFocusVisible(TraversalDirection.down);
           AppLogger.debug(
             'Down moved within mini to ${_focusLabel(FocusManager.instance.primaryFocus)}',
             tag: 'ShellFocus',
@@ -521,7 +776,10 @@ class _ShellPageState extends ConsumerState<ShellPage> {
         if (primary != null) {
           final below = _nextBelow(_navRailFocus, primary);
           if (below != null) {
-            below.requestFocus();
+            _requestManagedFocus(
+              below,
+              direction: TraversalDirection.down,
+            );
             return KeyEventResult.handled;
           }
           // At bottom of nav rail — jump to mini player if available.
@@ -540,9 +798,33 @@ class _ShellPageState extends ConsumerState<ShellPage> {
         'Up pressed: ${_regionSnapshot()}',
         tag: 'ShellFocus',
       );
+      if (_contentFocus.hasFocus) {
+        if (FocusManager.instance.primaryFocus != null) {
+          if (_moveWithinScope(_contentFocus, TraversalDirection.up)) {
+            AppLogger.debug(
+              'Up moved within content to ${_focusLabel(FocusManager.instance.primaryFocus)}',
+              tag: 'ShellFocus',
+            );
+            return KeyEventResult.handled;
+          }
+          _focusNavRailFromContent();
+          AppLogger.debug(
+            'Up jumped content -> nav, now ${_focusLabel(FocusManager.instance.primaryFocus)}',
+            tag: 'ShellFocus',
+          );
+          return KeyEventResult.handled;
+        }
+      }
       if (_miniPlayerFocus.hasFocus) {
-        final moved = FocusManager.instance.primaryFocus?.focusInDirection(TraversalDirection.up) ?? false;
-        if (moved) {
+        final primary = FocusManager.instance.primaryFocus;
+        final above =
+            primary == null ? null : _nextAbove(_miniPlayerFocus, primary);
+        if (above != null) {
+          _requestManagedFocus(
+            above,
+            direction: TraversalDirection.up,
+          );
+          _ensurePrimaryFocusVisible(TraversalDirection.up);
           AppLogger.debug(
             'Up moved within mini to ${_focusLabel(FocusManager.instance.primaryFocus)}',
             tag: 'ShellFocus',
@@ -561,7 +843,10 @@ class _ShellPageState extends ConsumerState<ShellPage> {
         if (primary != null) {
           final above = _nextAbove(_navRailFocus, primary);
           if (above != null) {
-            above.requestFocus();
+            _requestManagedFocus(
+              above,
+              direction: TraversalDirection.up,
+            );
             return KeyEventResult.handled;
           }
         }
@@ -570,33 +855,68 @@ class _ShellPageState extends ConsumerState<ShellPage> {
       }
     }
 
-    // ── Escape from nav rail → return to content (don't navigate back) ──
-    if (key == LogicalKeyboardKey.escape) {
+    // ── Back from shell contexts → close queue or leave nav rail ─────────
+    if (key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.gameButtonB ||
+        key == LogicalKeyboardKey.keyB) {
+      if (_showQueueDrawer) {
+        _closeQueueDrawer();
+        return KeyEventResult.handled;
+      }
       if (_navRailFocus.hasFocus) {
         _focusContentFromNavRail();
         return KeyEventResult.handled;
       }
     }
 
+    if (key == LogicalKeyboardKey.gameButtonLeft2) {
+      if (_hasMiniPlayer && ref.read(navigationProvider) != '/now-playing') {
+        _openNowPlayingScreen();
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    }
+
+    if (key == LogicalKeyboardKey.gameButtonRight2) {
+      if (_hasMiniPlayer && ref.read(navigationProvider) != '/now-playing') {
+        if (_showQueueDrawer) {
+          _closeQueueDrawer();
+        } else {
+          _openQueueDrawer();
+        }
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    }
+
     return KeyEventResult.ignored;
   }
 
-  bool get _hasMiniPlayer => ref.read(playbackProvider.select((s) => s.currentSong != null));
+  bool get _hasMiniPlayer =>
+      ref.read(playbackProvider.select((s) => s.currentSong != null));
+
+  void _toggleWideNavRail() {
+    _hasManualWideNavRailChoice = true;
+    final expanded = !_isWideNavRailExpanded;
+    setState(() => _isWideNavRailExpanded = expanded);
+    unawaited(_persistWideNavRailPreference(expanded));
+  }
 
   @override
   Widget build(BuildContext context) {
+    final sizes = AppSizes.of(context);
+    final isWideLayout =
+        MediaQuery.sizeOf(context).width >= AppConstants.layoutBreakpoint;
+    final isNavRailExpanded = isWideLayout && _isWideNavRailExpanded;
     final hasSong = ref.watch(
       playbackProvider.select((s) => s.currentSong != null),
+    );
+    final isPlaying = ref.watch(
+      playbackProvider.select((s) => s.isPlaying),
     );
     final currentRoute = ref.watch(navigationProvider);
     final multiSelect = ref.watch(multiSelectProvider);
     ref.watch(animateFocusScrollingProvider);
-    final hints = _hintsForContext(
-      context,
-      route: currentRoute,
-      hasSong: hasSong,
-      multiSelect: multiSelect,
-    );
 
     return DropTarget(
       onDragEntered: (_) => setState(() => _isDragging = true),
@@ -605,102 +925,140 @@ class _ShellPageState extends ConsumerState<ShellPage> {
         setState(() => _isDragging = false);
         _handleDroppedFiles(details);
       },
-      child: Stack(
-        children: [
-          Focus(
-            focusNode: _shellFocusNode,
-            onKeyEvent: _handleShellKey,
-            child: Column(
-              children: [
-                // ── Title bar ─────────────────────────────────────────────────
-                const CustomTitleBar(),
+      child: Focus(
+        focusNode: _shellFocusNode,
+        onKeyEvent: _handleShellKey,
+        child: Stack(
+          children: [
+            ExcludeFocus(
+              excluding: _showQueueDrawer,
+              child: Column(
+                children: [
+                  // ── Title bar ─────────────────────────────────────────────────
+                  const CustomTitleBar(),
 
-                // ── Main body ─────────────────────────────────────────────────
-                Expanded(
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            // ── Nav rail ────────────────────────────────────────────
-                            Focus(
-                              focusNode: _navRailFocus,
-                              canRequestFocus: false,
-                              skipTraversal: true,
-                              child: FocusTraversalGroup(
-                                policy: OrderedTraversalPolicy(),
-                                child: const SideNavRail(),
-                              ),
-                            ),
-
-                            // ── Content area ────────────────────────────────────────
-                            Expanded(
-                              child: Focus(
-                                focusNode: _contentFocus,
+                  // ── Main body ─────────────────────────────────────────────────
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              // ── Nav rail ────────────────────────────────────────────
+                              Focus(
+                                focusNode: _navRailFocus,
                                 canRequestFocus: false,
                                 skipTraversal: true,
                                 child: FocusTraversalGroup(
-                                  policy: OrderedTraversalPolicy(
-                                    requestFocusCallback: _requestTraversalFocus,
+                                  policy: OrderedTraversalPolicy(),
+                                  child: SideNavRail(
+                                    expanded: isNavRailExpanded,
+                                    showToggle: isWideLayout,
+                                    onToggleExpanded: _toggleWideNavRail,
                                   ),
-                                  child: widget.navigationShell,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
 
-                      // Mini player (only when a track is loaded) — full width
-                      if (hasSong)
-                        Focus(
-                          focusNode: _miniPlayerFocus,
-                          canRequestFocus: false,
-                          skipTraversal: true,
-                          child: FocusTraversalGroup(
-                            policy: OrderedTraversalPolicy(),
-                            child: MiniPlayerBar(
-                              onOpenNowPlaying: () => context.push('/now-playing'),
-                            ),
+                              // ── Content area ────────────────────────────────────────
+                              Expanded(
+                                child: Focus(
+                                  focusNode: _contentFocus,
+                                  canRequestFocus: false,
+                                  skipTraversal: true,
+                                  child: FocusTraversalGroup(
+                                    policy: OrderedTraversalPolicy(
+                                      requestFocusCallback:
+                                          _requestTraversalFocus,
+                                    ),
+                                    child: widget.navigationShell,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
 
-                      // Gamepad button hints (always visible) — full width
-                      GamepadButtonHints(
-                        aLabel: hints.aLabel,
-                        bLabel: hints.bLabel,
-                        xLabel: hints.xLabel,
-                        yLabel: hints.yLabel,
-                        startLabel: hints.startLabel,
-                        leftLabel: hints.leftLabel,
-                        rightLabel: hints.rightLabel,
-                        lbLabel: hints.lbLabel,
-                        rbLabel: hints.rbLabel,
-                        onAPressed: hints.onAPressed,
-                        onBPressed: hints.onBPressed,
-                        onXPressed: hints.onXPressed,
-                        onYPressed: hints.onYPressed,
-                        onStartPressed: hints.onStartPressed,
-                        onLeftPressed: hints.onLeftPressed,
-                        onRightPressed: hints.onRightPressed,
-                        onLbPressed: hints.onLbPressed,
-                        onRbPressed: hints.onRbPressed,
-                        backgroundColor: hasSong ? context.appTheme.bgSurface : null,
-                      ),
-                    ],
+                        // Mini player (only when a track is loaded) — full width
+                        if (hasSong)
+                          Focus(
+                            focusNode: _miniPlayerFocus,
+                            canRequestFocus: false,
+                            skipTraversal: true,
+                            child: FocusTraversalGroup(
+                              policy: OrderedTraversalPolicy(),
+                              child: MiniPlayerBar(
+                                onOpenNowPlaying: _openNowPlayingScreen,
+                                onOpenQueue: _openQueueDrawer,
+                              ),
+                            ),
+                          ),
+                        // Gamepad button hints (always visible) — full width
+                        ValueListenableBuilder<QueuePanelHintState?>(
+                          valueListenable: queuePanelHintState,
+                          builder: (context, queueHints, _) {
+                            final hints = _hintsForContext(
+                              context,
+                              route: currentRoute,
+                              hasSong: hasSong,
+                              isPlaying: isPlaying,
+                              multiSelect: multiSelect,
+                              queueHints: queueHints,
+                            );
+                            return GamepadButtonHints(
+                              aLabel: hints.aLabel,
+                              bLabel: hints.bLabel,
+                              xLabel: hints.xLabel,
+                              yLabel: hints.yLabel,
+                              startLabel: hints.startLabel,
+                              leftLabel: hints.leftLabel,
+                              rightLabel: hints.rightLabel,
+                              upLabel: hints.upLabel,
+                              downLabel: hints.downLabel,
+                              lbLabel: hints.lbLabel,
+                              rbLabel: hints.rbLabel,
+                              onAPressed: hints.onAPressed,
+                              onBPressed: hints.onBPressed,
+                              onXPressed: hints.onXPressed,
+                              onYPressed: hints.onYPressed,
+                              onStartPressed: hints.onStartPressed,
+                              onLeftPressed: hints.onLeftPressed,
+                              onRightPressed: hints.onRightPressed,
+                              onUpPressed: hints.onUpPressed,
+                              onDownPressed: hints.onDownPressed,
+                              onLbPressed: hints.onLbPressed,
+                              onRbPressed: hints.onRbPressed,
+                              backgroundColor:
+                                  hasSong ? context.appTheme.bgSurface : null,
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          if (_isDragging) const DropOverlay(),
-        ],
+            Positioned(
+              top: sizes.titleBarHeight,
+              left: 0,
+              right: 0,
+              bottom: sizes.buttonHintsHeight,
+              child: QueueDrawer(
+                isOpen: _showQueueDrawer,
+                onDismiss: _closeQueueDrawer,
+              ),
+            ),
+            if (_isDragging) const DropOverlay(),
+          ],
+        ),
       ),
     );
   }
 
   void _handleDroppedFiles(DropDoneDetails details) {
-    final validExtensions = AppConstants.supportedAudioExtensions.map((e) => e.toLowerCase()).toSet();
+    final validExtensions = AppConstants.supportedAudioExtensions
+        .map((e) => e.toLowerCase())
+        .toSet();
 
     final audioPaths = <String>[];
 
@@ -710,7 +1068,8 @@ class _ShellPageState extends ConsumerState<ShellPage> {
         // Recursively collect audio files from dropped directories.
         final dir = Directory(path);
         try {
-          for (final entity in dir.listSync(recursive: true, followLinks: false)) {
+          for (final entity
+              in dir.listSync(recursive: true, followLinks: false)) {
             if (entity is File) {
               final ext = entity.path.split('.').last.toLowerCase();
               if (validExtensions.contains('.$ext')) {
@@ -734,7 +1093,8 @@ class _ShellPageState extends ConsumerState<ShellPage> {
     final l10n = AppLocalizations.of(context);
     ref.read(scanProvider.notifier).scanSpecificFiles(audioPaths);
     ref.read(toastProvider.notifier).show(
-          l10n?.scanningDroppedFiles(audioPaths.length) ?? 'Adding ${audioPaths.length} file(s) to library\u2026',
+          l10n?.scanningDroppedFiles(audioPaths.length) ??
+              'Adding ${audioPaths.length} file(s) to library\u2026',
         );
   }
 
@@ -742,7 +1102,9 @@ class _ShellPageState extends ConsumerState<ShellPage> {
     BuildContext context, {
     required String route,
     required bool hasSong,
+    required bool isPlaying,
     required ({bool isActive, Set<int> selectedIds}) multiSelect,
+    QueuePanelHintState? queueHints,
   }) {
     final inNav = _isFocusWithinScope(_navRailFocus);
     final inMini = _isFocusWithinScope(_miniPlayerFocus);
@@ -761,9 +1123,16 @@ class _ShellPageState extends ConsumerState<ShellPage> {
     }
 
     if (miniPlayerVolumePopupVisible.value) {
+      final notifier = ref.read(playbackProvider.notifier);
+      final current = ref.read(playbackProvider.select((s) => s.volume));
       return _ButtonHintsData(
-        bLabel: 'Back',
+        bLabel: AppLocalizations.of(context)!.hintClose,
+        upLabel: AppLocalizations.of(context)!.hintVolumeUp,
+        downLabel: AppLocalizations.of(context)!.hintVolumeDown,
         onBPressed: miniPlayerVolumePopupDismiss.value,
+        onUpPressed: () => notifier.setVolume((current + 0.05).clamp(0.0, 1.0)),
+        onDownPressed: () =>
+            notifier.setVolume((current - 0.05).clamp(0.0, 1.0)),
       );
     }
 
@@ -783,6 +1152,23 @@ class _ShellPageState extends ConsumerState<ShellPage> {
       );
     }
 
+    if (_showQueueDrawer && queueHints != null) {
+      return _ButtonHintsData(
+        aLabel: queueHints.aLabel,
+        bLabel: queueHints.bLabel,
+        xLabel: queueHints.xLabel,
+        yLabel: queueHints.yLabel,
+        upLabel: queueHints.upLabel,
+        downLabel: queueHints.downLabel,
+        onAPressed: queueHints.onAPressed,
+        onBPressed: queueHints.onBPressed,
+        onXPressed: queueHints.onXPressed,
+        onYPressed: queueHints.onYPressed,
+        onUpPressed: queueHints.onUpPressed,
+        onDownPressed: queueHints.onDownPressed,
+      );
+    }
+
     // Region-level overrides come first.
     if (inNav) {
       return _withStartHint(
@@ -791,18 +1177,23 @@ class _ShellPageState extends ConsumerState<ShellPage> {
           onAPressed: focusedCaps?.onA,
         ),
         hasSong: hasSong,
+        isPlaying: isPlaying,
       );
     }
 
     if (inMini) {
-      final isSeekFocused = focusedCaps?.node.debugLabel == 'MiniPlayer-seekBar';
+      final isSeekFocused =
+          focusedCaps?.node.debugLabel == 'MiniPlayer-seekBar';
       final playbackState = ref.read(playbackProvider);
       final totalMs = playbackState.duration.inMilliseconds;
 
       void seekByStep(int deltaMs) {
         if (totalMs <= 0) return;
-        final targetMs = (playbackState.position.inMilliseconds + deltaMs).clamp(0, totalMs);
-        ref.read(playbackProvider.notifier).seek(Duration(milliseconds: targetMs));
+        final targetMs =
+            (playbackState.position.inMilliseconds + deltaMs).clamp(0, totalMs);
+        ref
+            .read(playbackProvider.notifier)
+            .seek(Duration(milliseconds: targetMs));
       }
 
       return _withStartHint(
@@ -815,14 +1206,21 @@ class _ShellPageState extends ConsumerState<ShellPage> {
           onYPressed: focusedCaps?.onY,
           leftLabel: isSeekFocused ? 'Rewind' : null,
           rightLabel: isSeekFocused ? 'Forward' : null,
-          onLeftPressed: isSeekFocused ? () => seekByStep(-AppConstants.seekStepMs) : null,
-          onRightPressed: isSeekFocused ? () => seekByStep(AppConstants.seekStepMs) : null,
+          onLeftPressed:
+              isSeekFocused ? () => seekByStep(-AppConstants.seekStepMs) : null,
+          onRightPressed:
+              isSeekFocused ? () => seekByStep(AppConstants.seekStepMs) : null,
           lbLabel: hasSong ? 'Prev' : null,
           rbLabel: hasSong ? 'Next' : null,
-          onLbPressed: hasSong ? () => ref.read(playbackProvider.notifier).skipPrevious() : null,
-          onRbPressed: hasSong ? () => ref.read(playbackProvider.notifier).skipNext() : null,
+          onLbPressed: hasSong
+              ? () => ref.read(playbackProvider.notifier).skipPrevious()
+              : null,
+          onRbPressed: hasSong
+              ? () => ref.read(playbackProvider.notifier).skipNext()
+              : null,
         ),
         hasSong: hasSong,
+        isPlaying: isPlaying,
       );
     }
 
@@ -854,10 +1252,25 @@ class _ShellPageState extends ConsumerState<ShellPage> {
         onXPressed: focusedCaps.supportsX ? focusedCaps.onX : null,
         onYPressed: focusedCaps.supportsY ? focusedCaps.onY : null,
       );
+
+      final isLibraryTabStrip = route == '/library' &&
+          (focusedCaps.node.debugLabel?.startsWith('LibraryPage-tab-') ??
+              false);
+      if (isLibraryTabStrip) {
+        base = base.copyWith(
+          aLabel: 'Switch Tab',
+          onAPressed: focusedCaps.onA,
+          xLabel: null,
+          onXPressed: null,
+          yLabel: null,
+          onYPressed: null,
+        );
+      }
     }
 
     final isLibraryTabs = route == '/library' && inContent;
-    final canGoUpInLibraryFolders = route == '/library' && inContent && libraryFoldersCanGoUp.value;
+    final canGoUpInLibraryFolders =
+        route == '/library' && inContent && libraryFoldersCanGoUp.value;
 
     return _withStartHint(
         base.copyWith(
@@ -870,7 +1283,9 @@ class _ShellPageState extends ConsumerState<ShellPage> {
                     delta: -1,
                   );
                 }
-              : (hasSong ? () => ref.read(playbackProvider.notifier).skipPrevious() : null),
+              : (hasSong
+                  ? () => ref.read(playbackProvider.notifier).skipPrevious()
+                  : null),
           onRbPressed: isLibraryTabs
               ? () {
                   libraryTabCommand.value = LibraryTabCommand(
@@ -878,22 +1293,32 @@ class _ShellPageState extends ConsumerState<ShellPage> {
                     delta: 1,
                   );
                 }
-              : (hasSong ? () => ref.read(playbackProvider.notifier).skipNext() : null),
+              : (hasSong
+                  ? () => ref.read(playbackProvider.notifier).skipNext()
+                  : null),
           bLabel: canGoUpInLibraryFolders ? 'Back' : (canPop ? 'Back' : null),
-          onBPressed: canGoUpInLibraryFolders ? requestLibraryFoldersGoUp : (canPop ? () => GoRouter.of(context).pop() : null),
+          onBPressed: canGoUpInLibraryFolders
+              ? requestLibraryFoldersGoUp
+              : (canPop ? () => GoRouter.of(context).pop() : null),
         ),
-        hasSong: hasSong);
+        hasSong: hasSong,
+        isPlaying: isPlaying);
   }
 
-  _ButtonHintsData _withStartHint(_ButtonHintsData hints, {required bool hasSong}) {
+  _ButtonHintsData _withStartHint(
+    _ButtonHintsData hints, {
+    required bool hasSong,
+    required bool isPlaying,
+  }) {
     if (!hasSong) return hints.copyWith(startLabel: null, onStartPressed: null);
-    if (hints.faceButtonCount > 3) return hints.copyWith(startLabel: null, onStartPressed: null);
-
-    final isPlaying = ref.read(playbackProvider.select((state) => state.isPlaying));
+    if (hints.faceButtonCount > 3) {
+      return hints.copyWith(startLabel: null, onStartPressed: null);
+    }
 
     return hints.copyWith(
       startLabel: isPlaying ? 'Pause' : 'Play',
-      onStartPressed: () => ref.read(playbackProvider.notifier).togglePlayPause(),
+      onStartPressed: () =>
+          ref.read(playbackProvider.notifier).togglePlayPause(),
     );
   }
 
@@ -992,6 +1417,8 @@ class _ButtonHintsData {
     this.startLabel,
     this.leftLabel,
     this.rightLabel,
+    this.upLabel,
+    this.downLabel,
     this.lbLabel,
     this.rbLabel,
     this.onAPressed,
@@ -1001,6 +1428,8 @@ class _ButtonHintsData {
     this.onStartPressed,
     this.onLeftPressed,
     this.onRightPressed,
+    this.onUpPressed,
+    this.onDownPressed,
     this.onLbPressed,
     this.onRbPressed,
   });
@@ -1011,6 +1440,8 @@ class _ButtonHintsData {
   final String? startLabel;
   final String? leftLabel;
   final String? rightLabel;
+  final String? upLabel;
+  final String? downLabel;
   final String? lbLabel;
   final String? rbLabel;
   final VoidCallback? onAPressed;
@@ -1020,6 +1451,8 @@ class _ButtonHintsData {
   final VoidCallback? onStartPressed;
   final VoidCallback? onLeftPressed;
   final VoidCallback? onRightPressed;
+  final VoidCallback? onUpPressed;
+  final VoidCallback? onDownPressed;
   final VoidCallback? onLbPressed;
   final VoidCallback? onRbPressed;
 
@@ -1042,6 +1475,8 @@ class _ButtonHintsData {
     Object? startLabel = _unset,
     Object? leftLabel = _unset,
     Object? rightLabel = _unset,
+    Object? upLabel = _unset,
+    Object? downLabel = _unset,
     Object? lbLabel = _unset,
     Object? rbLabel = _unset,
     Object? onAPressed = _unset,
@@ -1051,6 +1486,8 @@ class _ButtonHintsData {
     Object? onStartPressed = _unset,
     Object? onLeftPressed = _unset,
     Object? onRightPressed = _unset,
+    Object? onUpPressed = _unset,
+    Object? onDownPressed = _unset,
     Object? onLbPressed = _unset,
     Object? onRbPressed = _unset,
   }) {
@@ -1059,20 +1496,52 @@ class _ButtonHintsData {
       bLabel: identical(bLabel, _unset) ? this.bLabel : bLabel as String?,
       xLabel: identical(xLabel, _unset) ? this.xLabel : xLabel as String?,
       yLabel: identical(yLabel, _unset) ? this.yLabel : yLabel as String?,
-      startLabel: identical(startLabel, _unset) ? this.startLabel : startLabel as String?,
-      leftLabel: identical(leftLabel, _unset) ? this.leftLabel : leftLabel as String?,
-      rightLabel: identical(rightLabel, _unset) ? this.rightLabel : rightLabel as String?,
+      startLabel: identical(startLabel, _unset)
+          ? this.startLabel
+          : startLabel as String?,
+      leftLabel:
+          identical(leftLabel, _unset) ? this.leftLabel : leftLabel as String?,
+      rightLabel: identical(rightLabel, _unset)
+          ? this.rightLabel
+          : rightLabel as String?,
+      upLabel: identical(upLabel, _unset) ? this.upLabel : upLabel as String?,
+      downLabel:
+          identical(downLabel, _unset) ? this.downLabel : downLabel as String?,
       lbLabel: identical(lbLabel, _unset) ? this.lbLabel : lbLabel as String?,
       rbLabel: identical(rbLabel, _unset) ? this.rbLabel : rbLabel as String?,
-      onAPressed: identical(onAPressed, _unset) ? this.onAPressed : onAPressed as VoidCallback?,
-      onBPressed: identical(onBPressed, _unset) ? this.onBPressed : onBPressed as VoidCallback?,
-      onXPressed: identical(onXPressed, _unset) ? this.onXPressed : onXPressed as VoidCallback?,
-      onYPressed: identical(onYPressed, _unset) ? this.onYPressed : onYPressed as VoidCallback?,
-      onStartPressed: identical(onStartPressed, _unset) ? this.onStartPressed : onStartPressed as VoidCallback?,
-      onLeftPressed: identical(onLeftPressed, _unset) ? this.onLeftPressed : onLeftPressed as VoidCallback?,
-      onRightPressed: identical(onRightPressed, _unset) ? this.onRightPressed : onRightPressed as VoidCallback?,
-      onLbPressed: identical(onLbPressed, _unset) ? this.onLbPressed : onLbPressed as VoidCallback?,
-      onRbPressed: identical(onRbPressed, _unset) ? this.onRbPressed : onRbPressed as VoidCallback?,
+      onAPressed: identical(onAPressed, _unset)
+          ? this.onAPressed
+          : onAPressed as VoidCallback?,
+      onBPressed: identical(onBPressed, _unset)
+          ? this.onBPressed
+          : onBPressed as VoidCallback?,
+      onXPressed: identical(onXPressed, _unset)
+          ? this.onXPressed
+          : onXPressed as VoidCallback?,
+      onYPressed: identical(onYPressed, _unset)
+          ? this.onYPressed
+          : onYPressed as VoidCallback?,
+      onStartPressed: identical(onStartPressed, _unset)
+          ? this.onStartPressed
+          : onStartPressed as VoidCallback?,
+      onLeftPressed: identical(onLeftPressed, _unset)
+          ? this.onLeftPressed
+          : onLeftPressed as VoidCallback?,
+      onRightPressed: identical(onRightPressed, _unset)
+          ? this.onRightPressed
+          : onRightPressed as VoidCallback?,
+      onUpPressed: identical(onUpPressed, _unset)
+          ? this.onUpPressed
+          : onUpPressed as VoidCallback?,
+      onDownPressed: identical(onDownPressed, _unset)
+          ? this.onDownPressed
+          : onDownPressed as VoidCallback?,
+      onLbPressed: identical(onLbPressed, _unset)
+          ? this.onLbPressed
+          : onLbPressed as VoidCallback?,
+      onRbPressed: identical(onRbPressed, _unset)
+          ? this.onRbPressed
+          : onRbPressed as VoidCallback?,
     );
   }
 }

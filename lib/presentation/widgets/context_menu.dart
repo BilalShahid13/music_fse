@@ -80,7 +80,7 @@ typedef ContextMenuEntry = Object; // ContextMenuItem | ContextMenuSeparator
 /// - Shadow: 0 8px 32px rgba(0,0,0,0.8)
 /// - Item height: 40px, padding 0 16px
 /// - Icon: 18×18 textSecondary, 12px gap to text
-/// - Hover/focus: bgCardHover background
+/// - Focus: bgCardHover background
 /// - Separator: 1px borderSubtle, margin 4px 0
 ///
 /// Gamepad:
@@ -252,6 +252,7 @@ class _AppContextMenuState extends State<AppContextMenu> with SingleTickerProvid
         return KeyEventResult.handled;
       case LogicalKeyboardKey.escape:
       case LogicalKeyboardKey.gameButtonB:
+      case LogicalKeyboardKey.keyB:
         _dismiss();
         return KeyEventResult.handled;
       case LogicalKeyboardKey.arrowRight:
@@ -435,40 +436,37 @@ class _MenuItem extends StatelessWidget {
     final iconColor = item.isDangerous ? ext.destructive : ext.textSecondary;
     final bgColor = isFocused ? ext.bgCardHover : Colors.transparent;
 
-    return MouseRegion(
-      onEnter: (_) => onFocused(),
-      child: GestureDetector(
-        onTap: onSelected,
-        child: Focus(
-          focusNode: focusNode,
-          onKeyEvent: (node, event) => onKeyEvent(event),
-          onFocusChange: (focused) {
-            if (focused) onFocused();
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 80),
-            height: 40,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            color: bgColor,
-            child: Row(
-              children: [
-                Icon(item.icon, size: 18, color: iconColor),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    item.label,
-                    style: tt.bodyMedium?.copyWith(color: textColor),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+    return GestureDetector(
+      onTap: onSelected,
+      child: Focus(
+        focusNode: focusNode,
+        onKeyEvent: (node, event) => onKeyEvent(event),
+        onFocusChange: (focused) {
+          if (focused) onFocused();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 80),
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          color: bgColor,
+          child: Row(
+            children: [
+              Icon(item.icon, size: 18, color: iconColor),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  item.label,
+                  style: tt.bodyMedium?.copyWith(color: textColor),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                if (item.submenu != null)
-                  Icon(
-                    LucideIcons.chevronRight,
-                    size: 16,
-                    color: ext.textTertiary,
-                  ),
-              ],
-            ),
+              ),
+              if (item.submenu != null)
+                Icon(
+                  LucideIcons.chevronRight,
+                  size: 16,
+                  color: ext.textTertiary,
+                ),
+            ],
           ),
         ),
       ),

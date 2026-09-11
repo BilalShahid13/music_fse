@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:path/path.dart' as p;
 
 import 'database.dart';
 
@@ -119,10 +120,19 @@ class SongDao extends DatabaseAccessor<AppDatabase> with _$SongDaoMixin {
 
   /// Returns songs whose [filePath] is directly under [folderPath]
   /// (one directory level — not recursive).
-  Future<List<Song>> getSongsByFolder(String folderPath) => (select(songs)
-        ..where((s) => s.filePath.like('${_escapeLike(folderPath)}/%'))
-        ..orderBy([(s) => OrderingTerm.asc(s.title)]))
-      .get();
+  Future<List<Song>> getSongsByFolder(String folderPath) {
+    final escapedPrefix = '${_escapeLike(folderPath)}${_escapeLike(p.separator)}%';
+    return customSelect(
+      r'''
+      SELECT songs.*
+      FROM songs
+      WHERE file_path LIKE ? ESCAPE '\'
+      ORDER BY title ASC
+      ''',
+      variables: [Variable.withString(escapedPrefix)],
+      readsFrom: {songs},
+    ).map((row) => songs.map(row.data)).get();
+  }
 
   Future<List<Song>> getFavorites({
     String? sortBy,
@@ -224,6 +234,8 @@ class SongDao extends DatabaseAccessor<AppDatabase> with _$SongDaoMixin {
       );
 
   Future<int> deleteSong(int id) => (delete(songs)..where((s) => s.id.equals(id))).go();
+
+  Future<int> clearAllSongs() => delete(songs).go();
 
   Future<int> getSongCount() async {
     final row = await (selectOnly(songs)..addColumns([songs.id.count()])).getSingle();

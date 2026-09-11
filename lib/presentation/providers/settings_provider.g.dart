@@ -223,6 +223,91 @@ abstract class _$AnimateFocusScrollingNotifier extends $AsyncNotifier<bool> {
   }
 }
 
+@ProviderFor(MiniPlayerArtBackgroundNotifier)
+final miniPlayerArtBackgroundProvider =
+    MiniPlayerArtBackgroundNotifierProvider._();
+
+final class MiniPlayerArtBackgroundNotifierProvider
+    extends $AsyncNotifierProvider<MiniPlayerArtBackgroundNotifier, bool> {
+  MiniPlayerArtBackgroundNotifierProvider._()
+      : super(
+          from: null,
+          argument: null,
+          retry: null,
+          name: r'miniPlayerArtBackgroundProvider',
+          isAutoDispose: false,
+          dependencies: null,
+          $allTransitiveDependencies: null,
+        );
+
+  @override
+  String debugGetCreateSourceHash() => _$miniPlayerArtBackgroundNotifierHash();
+
+  @$internal
+  @override
+  MiniPlayerArtBackgroundNotifier create() => MiniPlayerArtBackgroundNotifier();
+}
+
+String _$miniPlayerArtBackgroundNotifierHash() =>
+    r'2f3fa676f431e2ffc160c0152b6fc2ee06095773';
+
+abstract class _$MiniPlayerArtBackgroundNotifier extends $AsyncNotifier<bool> {
+  FutureOr<bool> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<AsyncValue<bool>, bool>;
+    final element = ref.element as $ClassProviderElement<
+        AnyNotifier<AsyncValue<bool>, bool>,
+        AsyncValue<bool>,
+        Object?,
+        Object?>;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(NavSoundEnabledNotifier)
+final navSoundEnabledProvider = NavSoundEnabledNotifierProvider._();
+
+final class NavSoundEnabledNotifierProvider
+    extends $AsyncNotifierProvider<NavSoundEnabledNotifier, bool> {
+  NavSoundEnabledNotifierProvider._()
+      : super(
+          from: null,
+          argument: null,
+          retry: null,
+          name: r'navSoundEnabledProvider',
+          isAutoDispose: false,
+          dependencies: null,
+          $allTransitiveDependencies: null,
+        );
+
+  @override
+  String debugGetCreateSourceHash() => _$navSoundEnabledNotifierHash();
+
+  @$internal
+  @override
+  NavSoundEnabledNotifier create() => NavSoundEnabledNotifier();
+}
+
+String _$navSoundEnabledNotifierHash() =>
+    r'b4c451d60f2f7cd5f04526f3d9eb5e63c45ff44d';
+
+abstract class _$NavSoundEnabledNotifier extends $AsyncNotifier<bool> {
+  FutureOr<bool> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<AsyncValue<bool>, bool>;
+    final element = ref.element as $ClassProviderElement<
+        AnyNotifier<AsyncValue<bool>, bool>,
+        AsyncValue<bool>,
+        Object?,
+        Object?>;
+    element.handleCreate(ref, build);
+  }
+}
+
 @ProviderFor(NavSoundLevelNotifier)
 final navSoundLevelProvider = NavSoundLevelNotifierProvider._();
 
@@ -248,7 +333,7 @@ final class NavSoundLevelNotifierProvider
 }
 
 String _$navSoundLevelNotifierHash() =>
-    r'd8cef28b31e2ba8037d311859d81fa9c9e284c00';
+    r'ba58bf8670a2a5fdedd9f8c4a2529ced3b754497';
 
 abstract class _$NavSoundLevelNotifier extends $AsyncNotifier<double> {
   FutureOr<double> build();

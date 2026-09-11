@@ -24,9 +24,16 @@ import '../../../widgets/selectable_song_tile.dart';
 ///
 /// Gamepad: D-pad up/down to navigate, A to play, X for context menu, Y to favorite.
 class SongsTab extends ConsumerStatefulWidget {
-  const SongsTab({super.key, this.defaultItemFocusNode});
+  const SongsTab({
+    super.key,
+    this.defaultItemFocusNode,
+    this.scrollController,
+    this.isActive = false,
+  });
 
   final FocusNode? defaultItemFocusNode;
+  final ScrollController? scrollController;
+  final bool isActive;
 
   @override
   ConsumerState<SongsTab> createState() => _SongsTabState();
@@ -44,6 +51,7 @@ class _SongsTabState extends ConsumerState<SongsTab> {
     switch (event.logicalKey) {
       case LogicalKeyboardKey.escape:
       case LogicalKeyboardKey.gameButtonB:
+      case LogicalKeyboardKey.keyB:
         _cancelSelection();
         return KeyEventResult.handled;
       case LogicalKeyboardKey.gameButtonX:
@@ -72,10 +80,9 @@ class _SongsTabState extends ConsumerState<SongsTab> {
 
   @override
   void dispose() {
-    librarySelectionAddToQueue.value = null;
-    librarySelectionAddToPlaylist.value = null;
-    librarySelectionSelectAll.value = null;
-    librarySelectionCancel.value = null;
+    if (widget.isActive) {
+      _clearLibrarySelectionCommands();
+    }
     super.dispose();
   }
 
@@ -98,10 +105,9 @@ class _SongsTabState extends ConsumerState<SongsTab> {
     );
 
     final multiSelect = ref.watch(multiSelectProvider);
-    librarySelectionAddToQueue.value = multiSelect.isActive ? _addSelectionToQueue : null;
-    librarySelectionAddToPlaylist.value = multiSelect.isActive ? _addSelectionToPlaylist : null;
-    librarySelectionSelectAll.value = multiSelect.isActive ? _selectAllVisibleSongs : null;
-    librarySelectionCancel.value = multiSelect.isActive ? _cancelSelection : null;
+    if (widget.isActive) {
+      _syncLibrarySelectionCommands(multiSelect.isActive);
+    }
 
     return Focus(
       canRequestFocus: false,
@@ -119,6 +125,7 @@ class _SongsTabState extends ConsumerState<SongsTab> {
             );
           }
           return ListView.builder(
+            controller: widget.scrollController,
             padding: const EdgeInsets.only(top: 4),
             itemCount: songs.length,
             itemBuilder: (ctx, i) {
@@ -212,6 +219,23 @@ class _SongsTabState extends ConsumerState<SongsTab> {
 
   void _cancelSelection() {
     ref.read(multiSelectProvider.notifier).deactivate();
+  }
+
+  void _syncLibrarySelectionCommands(bool isSelectionActive) {
+    librarySelectionAddToQueue.value =
+        isSelectionActive ? _addSelectionToQueue : null;
+    librarySelectionAddToPlaylist.value =
+        isSelectionActive ? _addSelectionToPlaylist : null;
+    librarySelectionSelectAll.value =
+        isSelectionActive ? _selectAllVisibleSongs : null;
+    librarySelectionCancel.value = isSelectionActive ? _cancelSelection : null;
+  }
+
+  void _clearLibrarySelectionCommands() {
+    librarySelectionAddToQueue.value = null;
+    librarySelectionAddToPlaylist.value = null;
+    librarySelectionSelectAll.value = null;
+    librarySelectionCancel.value = null;
   }
 
   void _selectAllVisibleSongs() {

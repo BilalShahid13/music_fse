@@ -13,14 +13,14 @@ import '../../../core/localization/generated/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/entities/playback_state.dart';
 import '../../../domain/entities/song.dart';
+import '../../helpers/active_focus_request.dart';
 import '../../providers/favorites_provider.dart';
 import '../../providers/playback_provider.dart';
 import '../../widgets/art_placeholder.dart';
 import '../../widgets/focus_highlight.dart';
 import '../../widgets/focus_hint_registry.dart';
 import '../../widgets/gamepad_button_hints.dart';
-import '../../widgets/gamepad_slider.dart';
-import '../queue/queue_panel.dart';
+import '../queue/queue_drawer.dart';
 
 /// Full-screen Now Playing page.
 ///
@@ -45,10 +45,14 @@ class NowPlayingPage extends ConsumerStatefulWidget {
 class _NowPlayingPageState extends ConsumerState<NowPlayingPage> {
   bool _showQueue = false;
   bool _showLyrics = false;
+  bool _showVolumePopup = false;
   late final FocusNode _playPauseFocus;
   late final FocusNode _seekFocus;
   late final FocusNode _queueFocus;
+  late final FocusNode _volumeFocus;
   late final FocusNode _keyListenerFocusNode;
+  FocusNode? _queueReturnFocus;
+  final LayerLink _volumePopupLink = LayerLink();
 
   @override
   void initState() {
@@ -56,10 +60,10 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> {
     _playPauseFocus = FocusNode(debugLabel: 'NP-playPause');
     _seekFocus = FocusNode(debugLabel: 'NP-seekBar');
     _queueFocus = FocusNode(debugLabel: 'NP-queue');
-    _keyListenerFocusNode = FocusNode(debugLabel: 'NowPlayingPage-keyListener')..skipTraversal = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _playPauseFocus.requestFocus();
-    });
+    _volumeFocus = FocusNode(debugLabel: 'NP-volume');
+    _keyListenerFocusNode = FocusNode(debugLabel: 'NowPlayingPage-keyListener')
+      ..skipTraversal = true;
+    scheduleActiveFocusRequest(state: this, focusNode: _playPauseFocus);
   }
 
   @override
@@ -67,8 +71,61 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> {
     _playPauseFocus.dispose();
     _seekFocus.dispose();
     _queueFocus.dispose();
+    _volumeFocus.dispose();
     _keyListenerFocusNode.dispose();
     super.dispose();
+  }
+
+  void _showNowPlayingVolumePopup() {
+    if (_showVolumePopup) return;
+    if (_showQueue) {
+      _queueReturnFocus = null;
+      setState(() {
+        _showQueue = false;
+        _showVolumePopup = true;
+      });
+      return;
+    }
+    setState(() => _showVolumePopup = true);
+  }
+
+  void _openQueue() {
+    if (_showQueue) return;
+    _queueReturnFocus = FocusManager.instance.primaryFocus;
+    setState(() => _showQueue = true);
+  }
+
+  void _closeQueue({bool restoreFocus = true}) {
+    if (!_showQueue) return;
+
+    final returnFocus = _queueReturnFocus;
+    _queueReturnFocus = null;
+    setState(() => _showQueue = false);
+
+    if (!restoreFocus) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (returnFocus != null &&
+          returnFocus.context != null &&
+          returnFocus.canRequestFocus) {
+        returnFocus.requestFocus();
+        return;
+      }
+      if (_queueFocus.context != null && _queueFocus.canRequestFocus) {
+        _queueFocus.requestFocus();
+      }
+    });
+  }
+
+  void _dismissNowPlayingVolumePopup({bool restoreFocus = true}) {
+    if (!_showVolumePopup) return;
+    setState(() => _showVolumePopup = false);
+    if (!restoreFocus) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _volumeFocus.requestFocus();
+    });
   }
 
   void _seekByStep(int deltaMs) {
@@ -76,8 +133,22 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> {
     final totalMs = playbackState.duration.inMilliseconds;
     if (totalMs <= 0) return;
 
-    final targetMs = (playbackState.position.inMilliseconds + deltaMs).clamp(0, totalMs);
+    final targetMs =
+        (playbackState.position.inMilliseconds + deltaMs).clamp(0, totalMs);
     ref.read(playbackProvider.notifier).seek(Duration(milliseconds: targetMs));
+  }
+
+  void _toggleFavoriteCurrentSong() {
+    final song = ref.read(playbackProvider).currentSong;
+    if (song == null) return;
+
+    final favorites = ref.read(favoritesProvider()).value ?? const <Song>[];
+    final isFavorite = favorites.any((favorite) => favorite.id == song.id);
+
+    ref.read(favoritesProvider().notifier).toggleFavorite(
+          song.id,
+          isFavorite: isFavorite,
+        );
   }
 
   KeyEventResult _handleKey(KeyEvent event) {
@@ -85,13 +156,32 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> {
 
     final notifier = ref.read(playbackProvider.notifier);
 
+    if (_showVolumePopup) {
+      switch (event.logicalKey) {
+        case LogicalKeyboardKey.escape:
+        case LogicalKeyboardKey.gameButtonB:
+        case LogicalKeyboardKey.keyB:
+          _dismissNowPlayingVolumePopup();
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.gameButtonStart:
+        case LogicalKeyboardKey.space:
+        case LogicalKeyboardKey.gameButtonLeft1:
+        case LogicalKeyboardKey.gameButtonRight1:
+        case LogicalKeyboardKey.gameButtonY:
+        case LogicalKeyboardKey.keyY:
+          return KeyEventResult.handled;
+      }
+    }
+
     switch (event.logicalKey) {
       // B → back
       case LogicalKeyboardKey.escape:
       case LogicalKeyboardKey.gameButtonB:
       case LogicalKeyboardKey.keyB:
-        if (_showQueue) {
-          setState(() => _showQueue = false);
+        if (_showVolumePopup) {
+          _dismissNowPlayingVolumePopup();
+        } else if (_showQueue) {
+          _closeQueue();
         } else {
           context.pop();
         }
@@ -113,16 +203,33 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> {
         notifier.skipNext();
         return KeyEventResult.handled;
 
-      // LT → volume down
-      case LogicalKeyboardKey.gameButtonLeft2:
-        final vol = ref.read(playbackProvider).volume;
-        notifier.setVolume((vol - 0.05).clamp(0.0, 1.0));
+      // Y → favorite current song
+      case LogicalKeyboardKey.gameButtonY:
+      case LogicalKeyboardKey.keyY:
+        if (_showQueue || _showVolumePopup) {
+          return KeyEventResult.ignored;
+        }
+        _toggleFavoriteCurrentSong();
         return KeyEventResult.handled;
 
-      // RT → volume up
+      // LT → close now playing
+      case LogicalKeyboardKey.gameButtonLeft2:
+        if (_showVolumePopup) {
+          _dismissNowPlayingVolumePopup(restoreFocus: false);
+        }
+        context.pop();
+        return KeyEventResult.handled;
+
+      // RT → toggle queue
       case LogicalKeyboardKey.gameButtonRight2:
-        final vol = ref.read(playbackProvider).volume;
-        notifier.setVolume((vol + 0.05).clamp(0.0, 1.0));
+        if (_showVolumePopup) {
+          _dismissNowPlayingVolumePopup(restoreFocus: false);
+        }
+        if (_showQueue) {
+          _closeQueue();
+        } else {
+          _openQueue();
+        }
         return KeyEventResult.handled;
 
       // Right stick horizontal is handled by the seek widget directly.
@@ -134,16 +241,22 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> {
   Widget build(BuildContext context) {
     final playbackState = ref.watch(playbackProvider);
     final song = playbackState.currentSong;
+    final ext = context.appTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final edgeScrim = isDark ? Colors.black : Colors.white;
+    final surfaceWash = isDark ? ext.bgSurface : Colors.white;
+    final depthWash = isDark ? ext.bgSurface : ext.bgPrimary;
 
     return KeyboardListener(
       focusNode: _keyListenerFocusNode,
       onKeyEvent: _handleKey,
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: ext.bgDeep,
         body: Stack(
           children: [
             // ── Blurred background ───────────────────────────────────────
-            if (song?.artCachePath != null && File(song!.artCachePath!).existsSync())
+            if (song?.artCachePath != null &&
+                File(song!.artCachePath!).existsSync())
               Positioned.fill(
                 child: ImageFiltered(
                   imageFilter: ui.ImageFilter.blur(sigmaX: 60, sigmaY: 60),
@@ -153,11 +266,36 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> {
                   ),
                 ),
               ),
-            // Dark scrim over background
+
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.6),
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      edgeScrim.withValues(alpha: isDark ? 0.20 : 0.28),
+                      surfaceWash.withValues(alpha: isDark ? 0.48 : 0.54),
+                      depthWash.withValues(alpha: isDark ? 0.76 : 0.88),
+                    ],
+                    stops: const [0.0, 0.45, 1.0],
+                  ),
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      surfaceWash.withValues(alpha: isDark ? 0.08 : 0.04),
+                      Colors.transparent,
+                      surfaceWash.withValues(alpha: isDark ? 0.20 : 0.16),
+                    ],
+                    stops: const [0.0, 0.42, 1.0],
+                  ),
                 ),
               ),
             ),
@@ -166,52 +304,134 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> {
             Column(
               children: [
                 Expanded(
-                  child: Row(
+                  child: Stack(
                     children: [
-                      // Main area
-                      Expanded(
-                        child: _NowPlayingContent(
-                          playbackState: playbackState,
-                          song: song,
-                          playPauseFocus: _playPauseFocus,
-                          seekFocus: _seekFocus,
-                          queueFocus: _queueFocus,
-                          onToggleQueue: () => setState(() => _showQueue = !_showQueue),
-                          showLyrics: _showLyrics,
-                          onToggleLyrics: () => setState(() => _showLyrics = !_showLyrics),
+                      Positioned.fill(
+                        child: ExcludeFocus(
+                          excluding: _showQueue || _showVolumePopup,
+                          child: _NowPlayingContent(
+                            playbackState: playbackState,
+                            song: song,
+                            playPauseFocus: _playPauseFocus,
+                            seekFocus: _seekFocus,
+                            queueFocus: _queueFocus,
+                            volumeFocus: _volumeFocus,
+                            volumePopupLink: _volumePopupLink,
+                            onToggleQueue: () {
+                              if (_showVolumePopup) {
+                                _dismissNowPlayingVolumePopup(
+                                    restoreFocus: false);
+                              }
+                              if (_showQueue) {
+                                _closeQueue();
+                              } else {
+                                _openQueue();
+                              }
+                            },
+                            onToggleVolumePopup: _showNowPlayingVolumePopup,
+                            showLyrics: _showLyrics,
+                            onToggleLyrics: () =>
+                                setState(() => _showLyrics = !_showLyrics),
+                          ),
                         ),
                       ),
-
-                      // Queue panel (slide from right)
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: AppConstants.queueSlideMs),
-                        width: _showQueue ? AppConstants.queuePanelWidth : 0,
-                        child: _showQueue
-                            ? QueuePanel(
-                                onDismiss: () => setState(() => _showQueue = false),
-                              )
-                            : const SizedBox.shrink(),
+                      Positioned.fill(
+                        child: QueueDrawer(
+                          isOpen: _showQueue,
+                          onDismiss: _closeQueue,
+                        ),
                       ),
+                      if (_showVolumePopup)
+                        Positioned.fill(
+                          child: _NowPlayingVolumePopup(
+                            layerLink: _volumePopupLink,
+                            onDismiss: _dismissNowPlayingVolumePopup,
+                          ),
+                        ),
                     ],
                   ),
                 ),
 
                 // ── Gamepad button hints ────────────────────────────────
-                ValueListenableBuilder<FocusHintCapabilities?>(
-                  valueListenable: focusedHintCapabilities,
-                  builder: (context, focusedCaps, _) {
-                    final isSeekFocused = identical(focusedCaps?.node, _seekFocus);
-                    return GamepadButtonHints(
-                      aLabel: 'Play',
-                      bLabel: 'Back',
-                      yLabel: 'Favorite',
-                      leftLabel: isSeekFocused ? 'Rewind' : null,
-                      rightLabel: isSeekFocused ? 'Forward' : null,
-                      lbLabel: 'Prev',
-                      rbLabel: 'Next',
-                      onLeftPressed: isSeekFocused ? () => _seekByStep(-AppConstants.seekStepMs) : null,
-                      onRightPressed: isSeekFocused ? () => _seekByStep(AppConstants.seekStepMs) : null,
-                      backgroundColor: context.appTheme.bgSurface,
+                ValueListenableBuilder<QueuePanelHintState?>(
+                  valueListenable: queuePanelHintState,
+                  builder: (context, queueHints, _) {
+                    if (_showQueue && queueHints != null) {
+                      return GamepadButtonHints(
+                        aLabel: queueHints.aLabel,
+                        bLabel: queueHints.bLabel,
+                        xLabel: queueHints.xLabel,
+                        yLabel: queueHints.yLabel,
+                        upLabel: queueHints.upLabel,
+                        downLabel: queueHints.downLabel,
+                        onAPressed: queueHints.onAPressed,
+                        onBPressed: queueHints.onBPressed,
+                        onXPressed: queueHints.onXPressed,
+                        onYPressed: queueHints.onYPressed,
+                        onUpPressed: queueHints.onUpPressed,
+                        onDownPressed: queueHints.onDownPressed,
+                        backgroundColor: context.appTheme.bgSurface,
+                      );
+                    }
+
+                    if (_showVolumePopup) {
+                      final notifier = ref.read(playbackProvider.notifier);
+                      final current =
+                          ref.read(playbackProvider.select((s) => s.volume));
+                      final l10n = AppLocalizations.of(context)!;
+                      return GamepadButtonHints(
+                        bLabel: l10n.hintClose,
+                        upLabel: l10n.hintVolumeUp,
+                        downLabel: l10n.hintVolumeDown,
+                        onBPressed: _dismissNowPlayingVolumePopup,
+                        onUpPressed: () => notifier
+                            .setVolume((current + 0.05).clamp(0.0, 1.0)),
+                        onDownPressed: () => notifier
+                            .setVolume((current - 0.05).clamp(0.0, 1.0)),
+                        backgroundColor: context.appTheme.bgSurface,
+                      );
+                    }
+
+                    return ValueListenableBuilder<FocusHintCapabilities?>(
+                      valueListenable: focusedHintCapabilities,
+                      builder: (context, focusedCaps, _) {
+                        final l10n = AppLocalizations.of(context)!;
+                        final isSeekFocused =
+                            identical(focusedCaps?.node, _seekFocus);
+                        final hasPrimaryAction = focusedCaps?.supportsA == true;
+                        final isPlayFocused =
+                            identical(focusedCaps?.node, _playPauseFocus);
+                        return GamepadButtonHints(
+                          aLabel: hasPrimaryAction
+                              ? (isPlayFocused
+                                  ? l10n.hintPlay
+                                  : l10n.hintSelect)
+                              : null,
+                          bLabel: l10n.hintBack,
+                          yLabel: song != null ? l10n.hintFavorite : null,
+                          leftLabel: isSeekFocused ? 'Rewind' : null,
+                          rightLabel: isSeekFocused ? 'Forward' : null,
+                          lbLabel: l10n.hintPrevTrack,
+                          rbLabel: l10n.hintNextTrack,
+                          onAPressed:
+                              hasPrimaryAction ? focusedCaps?.onA : null,
+                          onBPressed: () => context.pop(),
+                          onYPressed:
+                              song != null ? _toggleFavoriteCurrentSong : null,
+                          onLeftPressed: isSeekFocused
+                              ? () => _seekByStep(-AppConstants.seekStepMs)
+                              : null,
+                          onRightPressed: isSeekFocused
+                              ? () => _seekByStep(AppConstants.seekStepMs)
+                              : null,
+                          onLbPressed: () => ref
+                              .read(playbackProvider.notifier)
+                              .skipPrevious(),
+                          onRbPressed: () =>
+                              ref.read(playbackProvider.notifier).skipNext(),
+                          backgroundColor: context.appTheme.bgSurface,
+                        );
+                      },
                     );
                   },
                 ),
@@ -235,7 +455,10 @@ class _NowPlayingContent extends ConsumerWidget {
     required this.playPauseFocus,
     required this.seekFocus,
     required this.queueFocus,
+    required this.volumeFocus,
+    required this.volumePopupLink,
     required this.onToggleQueue,
+    required this.onToggleVolumePopup,
     required this.showLyrics,
     required this.onToggleLyrics,
   });
@@ -245,7 +468,10 @@ class _NowPlayingContent extends ConsumerWidget {
   final FocusNode playPauseFocus;
   final FocusNode seekFocus;
   final FocusNode queueFocus;
+  final FocusNode volumeFocus;
+  final LayerLink volumePopupLink;
   final VoidCallback onToggleQueue;
+  final VoidCallback onToggleVolumePopup;
   final bool showLyrics;
   final VoidCallback onToggleLyrics;
 
@@ -253,14 +479,22 @@ class _NowPlayingContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final width = MediaQuery.of(context).size.width;
     final isWide = width >= AppConstants.layoutBreakpoint;
+    final sizes = AppSizes.of(context);
+    final wideColumnPadding = sizes.isCompact ? 24.0 : 32.0;
+    final wideRightPadding = wideColumnPadding + 36.0;
 
     if (isWide) {
       return Row(
         children: [
           Expanded(
             flex: 5,
-            child: Center(
-              child: showLyrics ? _LyricsPlaceholder(onToggle: onToggleLyrics) : _AlbumArt(song: song),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: wideColumnPadding),
+              child: Center(
+                child: showLyrics
+                    ? _LyricsPlaceholder(onToggle: onToggleLyrics)
+                    : _AlbumArt(song: song),
+              ),
             ),
           ),
           Expanded(
@@ -271,9 +505,18 @@ class _NowPlayingContent extends ConsumerWidget {
               playPauseFocus: playPauseFocus,
               seekFocus: seekFocus,
               queueFocus: queueFocus,
+              volumeFocus: volumeFocus,
+              volumePopupLink: volumePopupLink,
               onToggleQueue: onToggleQueue,
+              onToggleVolumePopup: onToggleVolumePopup,
               onToggleLyrics: onToggleLyrics,
               showLyrics: showLyrics,
+              contentPadding: EdgeInsets.fromLTRB(
+                wideColumnPadding,
+                wideColumnPadding,
+                wideRightPadding,
+                wideColumnPadding,
+              ),
             ),
           ),
         ],
@@ -292,7 +535,10 @@ class _NowPlayingContent extends ConsumerWidget {
             playPauseFocus: playPauseFocus,
             seekFocus: seekFocus,
             queueFocus: queueFocus,
+            volumeFocus: volumeFocus,
+            volumePopupLink: volumePopupLink,
             onToggleQueue: onToggleQueue,
+            onToggleVolumePopup: onToggleVolumePopup,
             onToggleLyrics: onToggleLyrics,
             showLyrics: showLyrics,
             compactInlineArtwork: !showLyrics,
@@ -337,7 +583,8 @@ class _AlbumArt extends StatelessWidget {
         child: SizedBox(
           width: artSize,
           height: artSize,
-          child: song?.artCachePath != null && File(song!.artCachePath!).existsSync()
+          child: song?.artCachePath != null &&
+                  File(song!.artCachePath!).existsSync()
               ? Image.file(File(song!.artCachePath!), fit: BoxFit.cover)
               : ArtPlaceholder(
                   size: artSize,
@@ -360,21 +607,22 @@ class _LyricsPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tt = Theme.of(context).textTheme;
+    final ext = context.appTheme;
     final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(LucideIcons.mic, size: 48, color: Colors.white38),
+          Icon(LucideIcons.mic, size: 48, color: ext.textTertiary),
           const SizedBox(height: 16),
           Text(
             l10n.lyricsComingSoon,
-            style: tt.bodyLarge?.copyWith(color: Colors.white70),
+            style: tt.bodyLarge?.copyWith(color: ext.textPrimary),
           ),
           const SizedBox(height: 8),
           Text(
             l10n.lyricsComingSoonDesc,
-            style: tt.bodySmall?.copyWith(color: Colors.white38),
+            style: tt.bodySmall?.copyWith(color: ext.textSecondary),
           ),
         ],
       ),
@@ -393,10 +641,14 @@ class _Controls extends ConsumerWidget {
     required this.playPauseFocus,
     required this.seekFocus,
     required this.queueFocus,
+    required this.volumeFocus,
+    required this.volumePopupLink,
     required this.onToggleQueue,
+    required this.onToggleVolumePopup,
     required this.onToggleLyrics,
     required this.showLyrics,
     this.compactInlineArtwork = false,
+    this.contentPadding,
   });
 
   final PlaybackState playbackState;
@@ -404,10 +656,14 @@ class _Controls extends ConsumerWidget {
   final FocusNode playPauseFocus;
   final FocusNode seekFocus;
   final FocusNode queueFocus;
+  final FocusNode volumeFocus;
+  final LayerLink volumePopupLink;
   final VoidCallback onToggleQueue;
+  final VoidCallback onToggleVolumePopup;
   final VoidCallback onToggleLyrics;
   final bool showLyrics;
   final bool compactInlineArtwork;
+  final EdgeInsetsGeometry? contentPadding;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -424,7 +680,7 @@ class _Controls extends ConsumerWidget {
     final innerGap = compact ? 12.0 : 16.0;
 
     return Padding(
-      padding: EdgeInsets.all(panelPad),
+      padding: contentPadding ?? EdgeInsets.all(panelPad),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -432,7 +688,8 @@ class _Controls extends ConsumerWidget {
           if (compactInlineArtwork)
             LayoutBuilder(
               builder: (context, constraints) {
-                final compactArtSize = (constraints.maxWidth * 0.22).clamp(96.0, 150.0);
+                final compactArtSize =
+                    (constraints.maxWidth * 0.22).clamp(96.0, 150.0);
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -522,7 +779,11 @@ class _Controls extends ConsumerWidget {
                 fill: isFav ? 1 : 0,
                 isActive: isFav,
                 size: 20,
-                onTap: song == null ? () {} : () => ref.read(favoritesProvider().notifier).toggleFavorite(song!.id, isFavorite: isFav),
+                onTap: song == null
+                    ? () {}
+                    : () => ref
+                        .read(favoritesProvider().notifier)
+                        .toggleFavorite(song!.id, isFavorite: isFav),
               ),
               const SizedBox(width: 12),
               // Queue toggle
@@ -549,13 +810,12 @@ class _Controls extends ConsumerWidget {
               ),
               const Spacer(),
               // Volume
-              Flexible(
-                child: _VolumeControl(
-                  volume: playbackState.volume,
-                  isMuted: playbackState.isMuted,
-                  onVolumeChange: notifier.setVolume,
-                  onToggleMute: notifier.toggleMute,
-                ),
+              _VolumePopupTrigger(
+                volume: playbackState.volume,
+                isMuted: playbackState.isMuted,
+                focusNode: volumeFocus,
+                layerLink: volumePopupLink,
+                onTap: onToggleVolumePopup,
               ),
             ],
           ),
@@ -580,13 +840,14 @@ class _NowPlayingMeta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ext = context.appTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           song?.title ?? 'Not Playing',
           style: titleStyle?.copyWith(
-            color: Colors.white,
+            color: ext.textPrimary,
             fontWeight: FontWeight.w700,
           ),
           maxLines: 2,
@@ -595,7 +856,7 @@ class _NowPlayingMeta extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           song?.artist ?? '',
-          style: subtitleStyle?.copyWith(color: Colors.white70),
+          style: subtitleStyle?.copyWith(color: ext.textSecondary),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -603,7 +864,7 @@ class _NowPlayingMeta extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             song!.album,
-            style: albumStyle?.copyWith(color: Colors.white54),
+            style: albumStyle?.copyWith(color: ext.textTertiary),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -656,7 +917,9 @@ class _SeekBarState extends State<_SeekBar> {
   void _seekByDirection(int direction) {
     final now = DateTime.now();
     final last = _lastSeekAt;
-    final isContinuous = last != null && now.difference(last).inMilliseconds <= 220 && direction == _lastDirection;
+    final isContinuous = last != null &&
+        now.difference(last).inMilliseconds <= 220 &&
+        direction == _lastDirection;
 
     if (isContinuous) {
       _seekStreak += 1;
@@ -671,7 +934,8 @@ class _SeekBarState extends State<_SeekBar> {
     if (totalMs <= 0) return;
 
     final stepMs = _acceleratedStepMs(_seekStreak);
-    final currentMs = (_dragValue ?? widget.position.inMilliseconds.toDouble()).round();
+    final currentMs =
+        (_dragValue ?? widget.position.inMilliseconds.toDouble()).round();
     final targetMs = (currentMs + (direction * stepMs)).clamp(0, totalMs);
     widget.onSeek(Duration(milliseconds: targetMs));
   }
@@ -687,7 +951,8 @@ class _SeekBarState extends State<_SeekBar> {
     final key = event.logicalKey;
 
     if (event is KeyUpEvent) {
-      if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight) {
+      if (key == LogicalKeyboardKey.arrowLeft ||
+          key == LogicalKeyboardKey.arrowRight) {
         _seekStreak = 0;
         _lastDirection = 0;
       }
@@ -712,8 +977,11 @@ class _SeekBarState extends State<_SeekBar> {
 
   @override
   Widget build(BuildContext context) {
+    final ext = context.appTheme;
+    final cs = Theme.of(context).colorScheme;
     final total = widget.duration.inMilliseconds.toDouble();
-    final current = (_dragValue ?? widget.position.inMilliseconds.toDouble()).clamp(0.0, total > 0 ? total : 1.0);
+    final current = (_dragValue ?? widget.position.inMilliseconds.toDouble())
+        .clamp(0.0, total > 0 ? total : 1.0);
 
     return FocusHighlight(
       focusNode: widget.focusNode,
@@ -726,10 +994,10 @@ class _SeekBarState extends State<_SeekBar> {
               trackHeight: 4,
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
-              thumbColor: Colors.white,
-              activeTrackColor: Theme.of(context).colorScheme.primary,
-              inactiveTrackColor: Colors.white24,
-              overlayColor: Colors.white24,
+              thumbColor: cs.primary,
+              activeTrackColor: cs.primary,
+              inactiveTrackColor: ext.textTertiary.withValues(alpha: 0.24),
+              overlayColor: cs.primary.withValues(alpha: 0.16),
             ),
             child: Slider(
               min: 0,
@@ -750,11 +1018,17 @@ class _SeekBarState extends State<_SeekBar> {
               children: [
                 Text(
                   _formatDuration(widget.position),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: ext.textSecondary),
                 ),
                 Text(
                   _formatDuration(widget.duration),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: ext.textSecondary),
                 ),
               ],
             ),
@@ -807,6 +1081,7 @@ class _ControlBtnState extends State<_ControlBtn> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final ext = context.appTheme;
     return FocusHighlight(
       focusNode: _focus,
       borderRadius: 24,
@@ -820,7 +1095,7 @@ class _ControlBtnState extends State<_ControlBtn> {
             widget.icon,
             size: widget.size,
             fill: widget.fill,
-            color: widget.isActive ? cs.primary : Colors.white70,
+            color: widget.isActive ? cs.primary : ext.textSecondary,
           ),
         ),
       ),
@@ -846,6 +1121,12 @@ class _PlayPauseBtnState extends State<_PlayPauseBtn> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final accentForegroundColor = Theme.of(context)
+            .filledButtonTheme
+            .style
+            ?.foregroundColor
+            ?.resolve({WidgetState.focused}) ??
+        cs.onPrimary;
     return FocusHighlight(
       focusNode: widget.focusNode,
       borderRadius: 36,
@@ -862,7 +1143,7 @@ class _PlayPauseBtnState extends State<_PlayPauseBtn> {
           child: Icon(
             widget.isPlaying ? LucideIcons.pause : LucideIcons.play,
             size: 26,
-            color: Colors.white,
+            color: accentForegroundColor,
           ),
         ),
       ),
@@ -878,6 +1159,7 @@ class _RepeatBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final ext = context.appTheme;
     final isActive = mode != RepeatMode.off;
     return GestureDetector(
       onTap: onTap,
@@ -890,7 +1172,7 @@ class _RepeatBtn extends StatelessWidget {
             Icon(
               mode == RepeatMode.one ? LucideIcons.repeat1 : LucideIcons.repeat,
               size: 20,
-              color: isActive ? cs.primary : Colors.white70,
+              color: isActive ? cs.primary : ext.textSecondary,
             ),
           ],
         ),
@@ -903,46 +1185,204 @@ class _RepeatBtn extends StatelessWidget {
 // Volume control
 // ---------------------------------------------------------------------------
 
-class _VolumeControl extends StatelessWidget {
-  const _VolumeControl({
+class _VolumePopupTrigger extends StatelessWidget {
+  const _VolumePopupTrigger({
     required this.volume,
     required this.isMuted,
-    required this.onVolumeChange,
-    required this.onToggleMute,
+    required this.focusNode,
+    required this.layerLink,
+    required this.onTap,
   });
   final double volume;
   final bool isMuted;
-  final void Function(double) onVolumeChange;
-  final VoidCallback onToggleMute;
+  final FocusNode focusNode;
+  final LayerLink layerLink;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 180,
-      child: Row(
-        children: [
-          _ControlBtn(
-            icon: isMuted ? LucideIcons.volumeX : LucideIcons.volume2,
-            size: 18,
-            onTap: onToggleMute,
+      width: AppConstants.minFocusableSize,
+      child: CompositedTransformTarget(
+        link: layerLink,
+        child: _ControlBtn(
+          focusNode: focusNode,
+          icon: isMuted || volume <= 0
+              ? LucideIcons.volumeX
+              : LucideIcons.volume2,
+          size: 18,
+          onTap: onTap,
+        ),
+      ),
+    );
+  }
+}
+
+class _NowPlayingVolumePopup extends ConsumerStatefulWidget {
+  const _NowPlayingVolumePopup({
+    required this.layerLink,
+    required this.onDismiss,
+  });
+
+  final LayerLink layerLink;
+  final VoidCallback onDismiss;
+
+  @override
+  ConsumerState<_NowPlayingVolumePopup> createState() =>
+      _NowPlayingVolumePopupState();
+}
+
+class _NowPlayingVolumePopupState
+    extends ConsumerState<_NowPlayingVolumePopup> {
+  final FocusNode _popupFocus = FocusNode(debugLabel: 'NP-volumePopup');
+  final FocusNode _sliderFocus =
+      FocusNode(canRequestFocus: false, skipTraversal: true);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _popupFocus.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _popupFocus.dispose();
+    _sliderFocus.dispose();
+    super.dispose();
+  }
+
+  KeyEventResult _handleKey(FocusNode _, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.gameButtonB ||
+        key == LogicalKeyboardKey.keyB) {
+      widget.onDismiss();
+      return KeyEventResult.handled;
+    }
+
+    final notifier = ref.read(playbackProvider.notifier);
+    final current = ref.read(playbackProvider.select((s) => s.volume));
+    const step = 0.05;
+
+    if (key == LogicalKeyboardKey.arrowUp) {
+      notifier.setVolume((current + step).clamp(0.0, 1.0));
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      notifier.setVolume((current - step).clamp(0.0, 1.0));
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight ||
+        key == LogicalKeyboardKey.tab) {
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final volume = ref.watch(playbackProvider.select((s) => s.volume));
+    final isMuted = ref.watch(playbackProvider.select((s) => s.isMuted));
+    final notifier = ref.read(playbackProvider.notifier);
+    final ext = context.appTheme;
+    final accent = Theme.of(context).colorScheme.primary;
+    final sizes = AppSizes.of(context);
+    final displayVolume = isMuted ? 0.0 : volume;
+    final pct = (displayVolume * 100).round();
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: widget.onDismiss,
+            behavior: HitTestBehavior.opaque,
+            child: const ColoredBox(color: Colors.transparent),
           ),
-          Expanded(
-            child: GamepadSlider(
-              value: isMuted ? 0 : volume,
-              onChanged: onVolumeChange,
-              step: 0.05,
-              sliderThemeData: SliderTheme.of(context).copyWith(
-                trackHeight: 3,
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                thumbColor: Colors.white,
-                activeTrackColor: Colors.white,
-                inactiveTrackColor: Colors.white30,
-                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+        ),
+        CompositedTransformFollower(
+          link: widget.layerLink,
+          showWhenUnlinked: false,
+          targetAnchor: Alignment.topCenter,
+          followerAnchor: Alignment.bottomCenter,
+          offset: const Offset(0, -8),
+          child: Focus(
+            focusNode: _popupFocus,
+            onKeyEvent: _handleKey,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                width: 48,
+                height: 180,
+                decoration: BoxDecoration(
+                  color: ext.bgSurface,
+                  borderRadius: BorderRadius.circular(sizes.cardRadiusSm),
+                  border: Border.all(color: ext.borderSubtle),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x66000000),
+                      blurRadius: 16,
+                      offset: Offset(0, -4),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '$pct',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: ext.textSecondary,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: RotatedBox(
+                        quarterTurns: -1,
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 3,
+                            thumbShape: const RoundSliderThumbShape(
+                                enabledThumbRadius: 6),
+                            overlayShape: SliderComponentShape.noOverlay,
+                            activeTrackColor: accent,
+                            inactiveTrackColor: ext.bgInput,
+                            thumbColor: accent,
+                          ),
+                          child: Slider(
+                            value: displayVolume,
+                            onChanged: notifier.setVolume,
+                            focusNode: _sliderFocus,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: notifier.toggleMute,
+                      child: Icon(
+                        isMuted ? LucideIcons.volumeX : LucideIcons.volume2,
+                        size: 16,
+                        color: isMuted ? accent : ext.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

@@ -37,15 +37,28 @@ part 'app_router.g.dart';
 ///  a [BuildContext].
 @Riverpod(keepAlive: true)
 GoRouter appRouter(Ref ref) {
-  final hasFoldersAsync = ref.watch(scanFoldersProvider);
-  final hasFolders = (hasFoldersAsync.value ?? []).isNotEmpty;
-  final isLoading = hasFoldersAsync.isLoading;
+  late final GoRouter router;
 
-  final router = GoRouter(
+  ({bool hasFolders, bool isLoading}) folderState() {
+    final foldersAsync = ref.read(scanFoldersProvider);
+    return (
+      hasFolders: (foldersAsync.value ?? []).isNotEmpty,
+      isLoading: foldersAsync.isLoading,
+    );
+  }
+
+  final initialFolderState = folderState();
+
+  router = GoRouter(
     // Initial location is only used on first app launch.
     // Once a route is active, this is not used.
-    initialLocation: isLoading ? '/splash' : (hasFolders ? '/home' : '/onboarding'),
+    initialLocation: initialFolderState.isLoading
+        ? '/splash'
+        : (initialFolderState.hasFolders ? '/home' : '/onboarding'),
     redirect: (context, state) {
+      final folderStateSnapshot = folderState();
+      final hasFolders = folderStateSnapshot.hasFolders;
+      final isLoading = folderStateSnapshot.isLoading;
       final path = state.uri.path;
 
       if (isLoading) {
@@ -251,6 +264,10 @@ GoRouter appRouter(Ref ref) {
       ),
     ],
   );
+
+  ref.listen(scanFoldersProvider, (_, __) {
+    router.refresh();
+  });
 
   // ── Route tracking ─────────────────────────────────────────────────────────
   // Keep NavigationNotifier in sync so non-widget code can query the active

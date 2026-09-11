@@ -148,6 +148,63 @@ class AnimateFocusScrollingNotifier extends _$AnimateFocusScrollingNotifier {
 }
 
 // ---------------------------------------------------------------------------
+// Mini Player Art Background
+// ---------------------------------------------------------------------------
+
+@Riverpod(keepAlive: true)
+class MiniPlayerArtBackgroundNotifier extends _$MiniPlayerArtBackgroundNotifier {
+  @override
+  Future<bool> build() async {
+    final repo = ref.read(settingsRepositoryProvider);
+    final result = await repo.getBool(SettingsKeys.miniPlayerArtBackground);
+    return result.valueOrNull ?? true;
+  }
+
+  Future<void> set(bool value) async {
+    final repo = ref.read(settingsRepositoryProvider);
+    final result = await repo.setBool(
+      SettingsKeys.miniPlayerArtBackground,
+      value: value,
+    );
+    result.when(
+      success: (_) => state = AsyncData(value),
+      failure: (e) => AppLogger.error(
+        'MiniPlayerArtBackgroundNotifier: set failed',
+        tag: 'MiniPlayerArtBackgroundNotifier',
+        error: e,
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Nav Sound Level (0.0 – 1.0)
+// ---------------------------------------------------------------------------
+
+@Riverpod(keepAlive: true)
+class NavSoundEnabledNotifier extends _$NavSoundEnabledNotifier {
+  @override
+  Future<bool> build() async {
+    final repo = ref.read(settingsRepositoryProvider);
+    final result = await repo.getBool(SettingsKeys.navSoundEnabled);
+    return result.valueOrNull ?? AppConstants.defaultNavSoundEnabled;
+  }
+
+  Future<void> set(bool value) async {
+    final repo = ref.read(settingsRepositoryProvider);
+    final result = await repo.setBool(SettingsKeys.navSoundEnabled, value: value);
+    result.when(
+      success: (_) => state = AsyncData(value),
+      failure: (e) => AppLogger.error(
+        'NavSoundEnabledNotifier: set failed',
+        tag: 'NavSoundEnabledNotifier',
+        error: e,
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Nav Sound Level (0.0 – 1.0)
 // ---------------------------------------------------------------------------
 

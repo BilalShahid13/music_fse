@@ -208,7 +208,6 @@ class _FocusHighlightState extends ConsumerState<FocusHighlight> {
           duration: const Duration(milliseconds: AppConstants.focusTransitionMs),
           curve: Curves.easeOut,
           padding: widget.padding,
-          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             shape: widget.isCircular ? BoxShape.circle : BoxShape.rectangle,
             borderRadius: widget.isCircular ? null : BorderRadius.circular(widget.borderRadius),

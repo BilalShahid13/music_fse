@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:flutter/services.dart';
@@ -10,6 +11,7 @@ import '../../core/constants/app_sizes.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/entities/playback_state.dart';
 import '../providers/playback_provider.dart';
+import '../providers/settings_provider.dart';
 import 'art_placeholder.dart';
 import 'focus_highlight.dart';
 import 'marquee_text.dart';
@@ -34,10 +36,17 @@ import 'mini_player_popup_registry.dart';
 /// Tapping album art or song title → navigates to Now Playing (caller must
 /// wire [onOpenNowPlaying]).
 class MiniPlayerBar extends ConsumerStatefulWidget {
-  const MiniPlayerBar({super.key, this.onOpenNowPlaying});
+  const MiniPlayerBar({
+    super.key,
+    this.onOpenNowPlaying,
+    this.onOpenQueue,
+  });
 
   /// Called when the user taps the album art or song title.
   final VoidCallback? onOpenNowPlaying;
+
+  /// Called when the user opens the queue screen/overlay.
+  final VoidCallback? onOpenQueue;
 
   @override
   ConsumerState<MiniPlayerBar> createState() => _MiniPlayerBarState();
@@ -50,6 +59,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> {
   final FocusNode _nextFocus = FocusNode();
   final FocusNode _repeatFocus = FocusNode();
   final FocusNode _seekFocus = FocusNode(debugLabel: 'MiniPlayer-seekBar');
+  final FocusNode _queueFocus = FocusNode();
   final FocusNode _volumeFocus = FocusNode();
   final FocusNode _openNowPlayingFocus = FocusNode();
 
@@ -61,6 +71,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> {
     _nextFocus.dispose();
     _repeatFocus.dispose();
     _seekFocus.dispose();
+    _queueFocus.dispose();
     _volumeFocus.dispose();
     _openNowPlayingFocus.dispose();
     super.dispose();
@@ -75,6 +86,11 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> {
     final ext = context.appTheme;
     final sizes = AppSizes.of(context);
     final compact = sizes.isCompact;
+    final showArtBackground =
+      ref.watch(miniPlayerArtBackgroundProvider).value ?? true;
+    final artPath = currentSong.artCachePath;
+    final hasArtBackground =
+        showArtBackground && artPath != null && File(artPath).existsSync();
 
     return Container(
       height: sizes.miniPlayerHeight,
@@ -82,42 +98,72 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> {
         color: ext.bgSurface,
         border: Border(top: BorderSide(color: ext.borderSubtle)),
       ),
-      child: Row(
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          // ── Left column ──────────────────────────────────────────────────
-          SizedBox(
-            width: compact ? 220.0 : 240.0,
-            child: _LeftColumn(
-              song: currentSong,
-              onTap: widget.onOpenNowPlaying,
-            ),
-          ),
-          // ── Center column ─────────────────────────────────────────────
-          Expanded(
-            child: _CenterColumn(
-              shuffleFocus: _shuffleFocus,
-              prevFocus: _prevFocus,
-              playFocus: _playFocus,
-              nextFocus: _nextFocus,
-              repeatFocus: _repeatFocus,
-              seekFocus: _seekFocus,
-              onShuffleKeyEvent: _horizontalKeyHandler(right: _prevFocus),
-              onPrevKeyEvent: _horizontalKeyHandler(left: _shuffleFocus, right: _playFocus),
-              onPlayKeyEvent: _horizontalKeyHandler(left: _prevFocus, right: _nextFocus),
-              onNextKeyEvent: _horizontalKeyHandler(left: _playFocus, right: _repeatFocus),
-              onRepeatKeyEvent: _horizontalKeyHandler(left: _nextFocus, right: _volumeFocus),
-            ),
-          ),
-          // ── Right column (same width as left for centering) ───────────
-          SizedBox(
-            width: compact ? 220.0 : 240.0,
-            child: _RightActions(
-              volumeFocus: _volumeFocus,
-              openNowPlayingFocus: _openNowPlayingFocus,
-              onOpenNowPlaying: widget.onOpenNowPlaying,
-              onVolumeKeyEvent: _horizontalKeyHandler(left: _repeatFocus, right: _openNowPlayingFocus),
-              onOpenNowPlayingKeyEvent: _horizontalKeyHandler(left: _volumeFocus),
-            ),
+          if (hasArtBackground)
+            _MiniPlayerArtBackground(artPath: artPath),
+          Row(
+            children: [
+              // ── Left column ──────────────────────────────────────────────────
+              SizedBox(
+                width: compact ? 220.0 : 240.0,
+                child: _LeftColumn(
+                  song: currentSong,
+                  onTap: widget.onOpenNowPlaying,
+                ),
+              ),
+              // ── Center column ─────────────────────────────────────────────
+              Expanded(
+                child: _CenterColumn(
+                  shuffleFocus: _shuffleFocus,
+                  prevFocus: _prevFocus,
+                  playFocus: _playFocus,
+                  nextFocus: _nextFocus,
+                  repeatFocus: _repeatFocus,
+                  seekFocus: _seekFocus,
+                  onShuffleKeyEvent: _horizontalKeyHandler(right: _prevFocus),
+                  onPrevKeyEvent: _horizontalKeyHandler(
+                    left: _shuffleFocus,
+                    right: _playFocus,
+                  ),
+                  onPlayKeyEvent: _horizontalKeyHandler(
+                    left: _prevFocus,
+                    right: _nextFocus,
+                  ),
+                  onNextKeyEvent: _horizontalKeyHandler(
+                    left: _playFocus,
+                    right: _repeatFocus,
+                  ),
+                  onRepeatKeyEvent: _horizontalKeyHandler(
+                    left: _nextFocus,
+                    right: _queueFocus,
+                  ),
+                ),
+              ),
+              // ── Right column (same width as left for centering) ───────────
+              SizedBox(
+                width: compact ? 220.0 : 240.0,
+                child: _RightActions(
+                  queueFocus: _queueFocus,
+                  volumeFocus: _volumeFocus,
+                  openNowPlayingFocus: _openNowPlayingFocus,
+                  onOpenQueue: widget.onOpenQueue,
+                  onOpenNowPlaying: widget.onOpenNowPlaying,
+                  onQueueKeyEvent: _horizontalKeyHandler(
+                    left: _repeatFocus,
+                    right: _volumeFocus,
+                  ),
+                  onVolumeKeyEvent: _horizontalKeyHandler(
+                    left: _queueFocus,
+                    right: _openNowPlayingFocus,
+                  ),
+                  onOpenNowPlayingKeyEvent: _horizontalKeyHandler(
+                    left: _volumeFocus,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -149,6 +195,67 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> {
 
       return KeyEventResult.ignored;
     };
+  }
+}
+
+class _MiniPlayerArtBackground extends StatelessWidget {
+  const _MiniPlayerArtBackground({required this.artPath});
+
+  final String artPath;
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = context.appTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final edgeScrim = isDark ? Colors.black : Colors.white;
+    final surfaceWash = isDark ? ext.bgSurface : Colors.white;
+    final depthWash = isDark ? ext.bgSurface : ext.bgPrimary;
+
+    return IgnorePointer(
+      child: ClipRect(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Transform.scale(
+              scale: 1.18,
+              child: ImageFiltered(
+                imageFilter: ui.ImageFilter.blur(sigmaX: 26, sigmaY: 26),
+                child: Image.file(
+                  File(artPath),
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    edgeScrim.withValues(alpha: isDark ? 0.18 : 0.28),
+                    surfaceWash.withValues(alpha: isDark ? 0.44 : 0.54),
+                    depthWash.withValues(alpha: isDark ? 0.88 : 0.90),
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
+                ),
+              ),
+            ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    surfaceWash.withValues(alpha: isDark ? 0.10 : 0.14),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -348,16 +455,22 @@ class _CenterColumn extends ConsumerWidget {
 
 class _RightActions extends ConsumerWidget {
   const _RightActions({
+    required this.queueFocus,
     required this.volumeFocus,
     required this.openNowPlayingFocus,
+    this.onOpenQueue,
     this.onOpenNowPlaying,
+    required this.onQueueKeyEvent,
     required this.onVolumeKeyEvent,
     required this.onOpenNowPlayingKeyEvent,
   });
 
+  final FocusNode queueFocus;
   final FocusNode volumeFocus;
   final FocusNode openNowPlayingFocus;
+  final VoidCallback? onOpenQueue;
   final VoidCallback? onOpenNowPlaying;
+  final FocusOnKeyEventCallback onQueueKeyEvent;
   final FocusOnKeyEventCallback onVolumeKeyEvent;
   final FocusOnKeyEventCallback onOpenNowPlayingKeyEvent;
 
@@ -368,6 +481,7 @@ class _RightActions extends ConsumerWidget {
 
     final ext = context.appTheme;
     final compact = AppSizes.of(context).isCompact;
+    final queueIconSize = compact ? 17.0 : 18.0;
 
     final displayVolume = isMuted ? 0.0 : volume;
     final volIcon = displayVolume == 0
@@ -378,39 +492,69 @@ class _RightActions extends ConsumerWidget {
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: compact ? 10.0 : 12.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          // Volume icon — tap or A button opens volume popup
-          _VolumeIconButton(
-            focusNode: volumeFocus,
-            icon: volIcon,
-            onTap: () => _showVolumePopup(context, ref),
-            onKeyEvent: onVolumeKeyEvent,
-          ),
-          SizedBox(width: compact ? 4.0 : 8.0),
-          // Open Now Playing
-          FocusHighlight(
-            focusNode: openNowPlayingFocus,
-            borderRadius: 8,
-            onPressed: onOpenNowPlaying,
-            onKeyEvent: onOpenNowPlayingKeyEvent,
-            child: GestureDetector(
-              onTap: onOpenNowPlaying,
-              child: SizedBox(
-                width: AppConstants.minFocusableSize,
-                height: AppConstants.minFocusableSize,
-                child: Center(
-                  child: Icon(
-                    LucideIcons.chevronUp,
-                    size: compact ? 18.0 : 20.0,
-                    color: ext.textSecondary,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final canShowQueueButton =
+              onOpenQueue != null && constraints.maxWidth >= 156;
+
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (canShowQueueButton) ...[
+                FocusHighlight(
+                  focusNode: queueFocus,
+                  borderRadius: 8,
+                  onPressed: onOpenQueue,
+                  onKeyEvent: onQueueKeyEvent,
+                  child: GestureDetector(
+                    onTap: onOpenQueue,
+                    child: SizedBox(
+                      width: AppConstants.minFocusableSize,
+                      height: AppConstants.minFocusableSize,
+                      child: Center(
+                        child: Icon(
+                          LucideIcons.listMusic,
+                          size: queueIconSize,
+                          color: ext.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: compact ? 2.0 : 4.0),
+              ],
+              // Volume icon — tap or A button opens volume popup
+              _VolumeIconButton(
+                focusNode: volumeFocus,
+                icon: volIcon,
+                onTap: () => _showVolumePopup(context, ref),
+                onKeyEvent: onVolumeKeyEvent,
+              ),
+              SizedBox(width: compact ? 4.0 : 8.0),
+              // Open Now Playing
+              FocusHighlight(
+                focusNode: openNowPlayingFocus,
+                borderRadius: 8,
+                onPressed: onOpenNowPlaying,
+                onKeyEvent: onOpenNowPlayingKeyEvent,
+                child: GestureDetector(
+                  onTap: onOpenNowPlaying,
+                  child: SizedBox(
+                    width: AppConstants.minFocusableSize,
+                    height: AppConstants.minFocusableSize,
+                    child: Center(
+                      child: Icon(
+                        LucideIcons.chevronUp,
+                        size: compact ? 18.0 : 20.0,
+                        color: ext.textSecondary,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -714,6 +858,12 @@ class _PlayPauseButtonState extends State<_PlayPauseButton> {
   @override
   Widget build(BuildContext context) {
     final accent = Theme.of(context).colorScheme.primary;
+    final accentForegroundColor = Theme.of(context)
+            .filledButtonTheme
+            .style
+            ?.foregroundColor
+            ?.resolve({WidgetState.focused}) ??
+        Theme.of(context).colorScheme.onPrimary;
     final sizes = AppSizes.of(context);
     final btnSize = sizes.miniPlayerPlayBtnSize;
     final iconSize = sizes.isCompact ? 14.0 : 16.0;
@@ -736,7 +886,7 @@ class _PlayPauseButtonState extends State<_PlayPauseButton> {
             child: Icon(
               widget.isPlaying ? LucideIcons.pause : LucideIcons.play,
               size: iconSize,
-              color: Colors.white,
+              color: accentForegroundColor,
             ),
           ),
         ),

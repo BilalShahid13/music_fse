@@ -30,6 +30,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navSettings => 'Settings';
 
   @override
+  String get navExpand => 'Expand';
+
+  @override
+  String get navCollapse => 'Collapse';
+
+  @override
   String get libTabSongs => 'Songs';
 
   @override
@@ -504,6 +510,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hintClose => 'Close';
 
   @override
+  String get hintMoveUp => 'Move Up';
+
+  @override
+  String get hintMoveDown => 'Move Down';
+
+  @override
+  String get hintVolumeUp => 'Volume Up';
+
+  @override
+  String get hintVolumeDown => 'Volume Down';
+
+  @override
+  String get hintIncrease => 'Increase';
+
+  @override
+  String get hintDecrease => 'Decrease';
+
+  @override
   String get hintPrevTrack => 'Prev';
 
   @override
@@ -627,7 +651,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get queueSaveTitle => 'Save Queue as Playlist';
+  String get queueSaveTitle => 'Save as Playlist';
 
   @override
   String get queueSaveHint => 'Playlist name';
@@ -847,6 +871,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get accentColor => 'Accent Color';
+
+  @override
+  String get accentTextColor => 'Text Color';
+
+  @override
+  String get accentTextColorAuto => 'Auto';
 
   @override
   String get customHex => 'Custom hex';

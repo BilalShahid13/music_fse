@@ -53,7 +53,7 @@ final class SearchNotifierProvider
   }
 }
 
-String _$searchNotifierHash() => r'8a6f406f876721c7755939a6109cb036450dffeb';
+String _$searchNotifierHash() => r'80dcfdc29f54674e215461ae2a8429506ab3ca15';
 
 /// Manages the search bar, live results, and search history.
 ///
@@ -116,7 +116,7 @@ final class SearchSongResultsProvider
   }
 }
 
-String _$searchSongResultsHash() => r'bcd2ca5f2b58e03c5b900682f9616bb2ecb686fa';
+String _$searchSongResultsHash() => r'f205eef77cc338070af28fb3ddef4f76a2f140f6';
 
 /// Album results from the current search.
 
@@ -163,7 +163,7 @@ final class SearchAlbumResultsProvider
 }
 
 String _$searchAlbumResultsHash() =>
-    r'7eecb603b38792e62cc013f2d7c945d248b5c706';
+    r'cb6bc0919aba2a059400202616c1463f94812ccb';
 
 /// Artist results from the current search.
 
@@ -210,7 +210,7 @@ final class SearchArtistResultsProvider
 }
 
 String _$searchArtistResultsHash() =>
-    r'd79505688b28dfcc7ebfafab7479b5343c6c743e';
+    r'312145b630b677cdc883ddf89b38b6ccce2eda4d';
 
 /// Playlist results from the current search.
 
@@ -257,4 +257,4 @@ final class SearchPlaylistResultsProvider
 }
 
 String _$searchPlaylistResultsHash() =>
-    r'be0d154eeea5da45564facd4477726ba231877a3';
+    r'10ad6058b8076a92b1db284d71d9232ba403df30';

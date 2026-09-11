@@ -22,6 +22,12 @@
   "navSettings": "Settings",
   "@navSettings": { "description": "Navigation item: Settings" },
 
+  "navExpand": "Expand",
+  "@navExpand": { "description": "Navigation rail action: expand" },
+
+  "navCollapse": "Collapse",
+  "@navCollapse": { "description": "Navigation rail action: collapse" },
+
   "libTabSongs": "Songs",
   "@libTabSongs": { "description": "Library tab: Songs" },
 
@@ -522,6 +528,24 @@
   "hintClose": "Close",
   "@hintClose": { "description": "Button hint: Close (B)" },
 
+  "hintMoveUp": "Move Up",
+  "@hintMoveUp": { "description": "Button hint: Move item up" },
+
+  "hintMoveDown": "Move Down",
+  "@hintMoveDown": { "description": "Button hint: Move item down" },
+
+  "hintVolumeUp": "Volume Up",
+  "@hintVolumeUp": { "description": "Button hint: Increase volume" },
+
+  "hintVolumeDown": "Volume Down",
+  "@hintVolumeDown": { "description": "Button hint: Decrease volume" },
+
+  "hintIncrease": "Increase",
+  "@hintIncrease": { "description": "Button hint: Increase current value" },
+
+  "hintDecrease": "Decrease",
+  "@hintDecrease": { "description": "Button hint: Decrease current value" },
+
   "hintPrevTrack": "Prev",
   "@hintPrevTrack": { "description": "Button hint: Previous Track (LB)" },
 
@@ -641,7 +665,7 @@
     }
   },
 
-  "queueSaveTitle": "Save Queue as Playlist",
+  "queueSaveTitle": "Save as Playlist",
   "@queueSaveTitle": { "description": "Title for save queue dialog" },
 
   "queueSaveHint": "Playlist name",
@@ -875,6 +899,12 @@
 
   "accentColor": "Accent Color",
   "@accentColor": { "description": "Color picker dialog title" },
+
+  "accentTextColor": "Text Color",
+  "@accentTextColor": { "description": "Color picker dialog label for accent foreground color" },
+
+  "accentTextColorAuto": "Auto",
+  "@accentTextColorAuto": { "description": "Color picker option for automatically selected accent foreground color" },
 
   "customHex": "Custom hex",
   "@customHex": { "description": "Color picker: custom hex input label" },

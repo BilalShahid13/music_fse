@@ -12,10 +12,13 @@ import '../../../core/localization/generated/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/entities/playback_state.dart';
 import '../../../domain/entities/song.dart';
+import '../../../platform/xinput/gamepad_scroll_target_mixin.dart';
 import '../../providers/favorites_provider.dart';
 import '../../providers/library_provider.dart';
+import '../../providers/navigation_provider.dart';
 import '../../providers/playback_provider.dart';
 import '../../providers/toast_provider.dart';
+import '../../helpers/active_focus_request.dart';
 import '../../helpers/add_to_playlist_helper.dart';
 import '../../widgets/art_placeholder.dart';
 import '../../widgets/context_menu.dart';
@@ -40,7 +43,8 @@ class AlbumDetailPage extends ConsumerStatefulWidget {
   ConsumerState<AlbumDetailPage> createState() => _AlbumDetailPageState();
 }
 
-class _AlbumDetailPageState extends ConsumerState<AlbumDetailPage> {
+class _AlbumDetailPageState extends ConsumerState<AlbumDetailPage>
+    with GamepadScrollTargetMixin {
   late final FocusNode _playAllFocus;
   late final FocusNode _keyListenerFocusNode;
 
@@ -48,10 +52,9 @@ class _AlbumDetailPageState extends ConsumerState<AlbumDetailPage> {
   void initState() {
     super.initState();
     _playAllFocus = FocusNode(debugLabel: 'AlbumDetail-playAll');
-    _keyListenerFocusNode = FocusNode(debugLabel: 'AlbumDetailPage-keyListener')..skipTraversal = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _playAllFocus.requestFocus();
-    });
+    _keyListenerFocusNode = FocusNode(debugLabel: 'AlbumDetailPage-keyListener')
+      ..skipTraversal = true;
+    scheduleActiveFocusRequest(state: this, focusNode: _playAllFocus);
   }
 
   @override
@@ -63,7 +66,9 @@ class _AlbumDetailPageState extends ConsumerState<AlbumDetailPage> {
 
   KeyEventResult _handleKey(KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    if (event.logicalKey == LogicalKeyboardKey.escape || event.logicalKey == LogicalKeyboardKey.gameButtonB) {
+    if (event.logicalKey == LogicalKeyboardKey.escape ||
+        event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+        event.logicalKey == LogicalKeyboardKey.keyB) {
       context.pop();
       return KeyEventResult.handled;
     }
@@ -81,6 +86,9 @@ class _AlbumDetailPageState extends ConsumerState<AlbumDetailPage> {
       playbackProvider.select((s) => s.currentSong?.id),
     );
     final favorites = ref.watch(favoritesProvider());
+    final currentRoute = ref.watch(navigationProvider);
+
+    syncGamepadScrollTarget(currentRoute.startsWith('/library/album/'));
 
     return KeyboardListener(
       focusNode: _keyListenerFocusNode,
@@ -91,7 +99,8 @@ class _AlbumDetailPageState extends ConsumerState<AlbumDetailPage> {
           children: [
             Expanded(
               child: songsAsync.when(
-                data: (songs) => _buildContent(context, ext, tt, songs, currentSongId, favorites),
+                data: (songs) => _buildContent(
+                    context, ext, tt, songs, currentSongId, favorites),
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (_, __) => const EmptyState(
                   icon: LucideIcons.circleAlert,
@@ -121,6 +130,7 @@ class _AlbumDetailPageState extends ConsumerState<AlbumDetailPage> {
     final sizes = AppSizes.of(context);
 
     return CustomScrollView(
+      controller: gamepadScrollController,
       slivers: [
         // ── Header ────────────────────────────────────────────────────────
         SliverToBoxAdapter(
@@ -145,7 +155,8 @@ class _AlbumDetailPageState extends ConsumerState<AlbumDetailPage> {
                             File(artPath),
                             fit: BoxFit.cover,
                           )
-                        : const ArtPlaceholder(size: AppConstants.detailArtSize),
+                        : const ArtPlaceholder(
+                            size: AppConstants.detailArtSize),
                   ),
                 ),
                 const SizedBox(width: 24),
@@ -173,7 +184,8 @@ class _AlbumDetailPageState extends ConsumerState<AlbumDetailPage> {
                         const SizedBox(height: 2),
                         Text(
                           '$year',
-                          style: tt.bodySmall?.copyWith(color: ext.textTertiary),
+                          style:
+                              tt.bodySmall?.copyWith(color: ext.textTertiary),
                         ),
                       ],
                       const SizedBox(height: 4),
@@ -194,7 +206,10 @@ class _AlbumDetailPageState extends ConsumerState<AlbumDetailPage> {
                                 ? null
                                 : () => ref
                                     .read(playbackProvider.notifier)
-                                    .playSong(songs.first, queue: songs, index: 0, sourceType: QueueSourceType.album),
+                                    .playSong(songs.first,
+                                        queue: songs,
+                                        index: 0,
+                                        sourceType: QueueSourceType.album),
                           ),
                           const SizedBox(width: 10),
                           _ActionButton(
@@ -203,10 +218,14 @@ class _AlbumDetailPageState extends ConsumerState<AlbumDetailPage> {
                             onTap: songs.isEmpty
                                 ? null
                                 : () {
-                                    final shuffled = List<Song>.from(songs)..shuffle();
+                                    final shuffled = List<Song>.from(songs)
+                                      ..shuffle();
                                     ref
                                         .read(playbackProvider.notifier)
-                                        .playSong(shuffled.first, queue: shuffled, index: 0, sourceType: QueueSourceType.album);
+                                        .playSong(shuffled.first,
+                                            queue: shuffled,
+                                            index: 0,
+                                            sourceType: QueueSourceType.album);
                                   },
                           ),
                         ],
@@ -230,9 +249,13 @@ class _AlbumDetailPageState extends ConsumerState<AlbumDetailPage> {
               index: i,
               isCurrentlyPlaying: song.id == currentSongId,
               isFavorite: favoriteIds.contains(song.id),
-              onTap: () => ref.read(playbackProvider.notifier).playSong(song, queue: songs, index: i, sourceType: QueueSourceType.album),
+              onTap: () => ref.read(playbackProvider.notifier).playSong(song,
+                  queue: songs, index: i, sourceType: QueueSourceType.album),
               onContextMenu: () => _showContextMenu(ctx, song),
-              onToggleFavorite: () => ref.read(favoritesProvider().notifier).toggleFavorite(song.id, isFavorite: favoriteIds.contains(song.id)),
+              onToggleFavorite: () => ref
+                  .read(favoritesProvider().notifier)
+                  .toggleFavorite(song.id,
+                      isFavorite: favoriteIds.contains(song.id)),
             );
           },
         ),
@@ -265,9 +288,13 @@ class _AlbumDetailPageState extends ConsumerState<AlbumDetailPage> {
         ),
         const ContextMenuSeparator(),
         ContextMenuItem(
-          label: song.isFavorite ? l10n.ctxRemoveFromFavorites : l10n.ctxAddToFavorites,
+          label: song.isFavorite
+              ? l10n.ctxRemoveFromFavorites
+              : l10n.ctxAddToFavorites,
           icon: song.isFavorite ? LucideIcons.heartOff : LucideIcons.heart,
-          onTap: () => ref.read(favoritesProvider().notifier).toggleFavorite(song.id, isFavorite: song.isFavorite),
+          onTap: () => ref
+              .read(favoritesProvider().notifier)
+              .toggleFavorite(song.id, isFavorite: song.isFavorite),
         ),
       ],
     );
@@ -332,7 +359,9 @@ class _ActionButtonState extends State<_ActionButton> {
               decoration: BoxDecoration(
                 color: widget.isPrimary ? cs.primary : ext.bgSurface,
                 borderRadius: BorderRadius.circular(AppConstants.btnRadius),
-                border: widget.isPrimary ? null : Border.all(color: ext.borderSubtle),
+                border: widget.isPrimary
+                    ? null
+                    : Border.all(color: ext.borderSubtle),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,

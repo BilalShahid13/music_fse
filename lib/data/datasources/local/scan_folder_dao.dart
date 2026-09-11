@@ -22,6 +22,8 @@ class ScanFolderDao extends DatabaseAccessor<AppDatabase>
   Future<void> removeFolder(int id) =>
       (delete(scanFolders)..where((f) => f.id.equals(id))).go();
 
+  Future<void> clearAllFolders() => delete(scanFolders).go();
+
   Future<void> toggleEnabled(int id, {required bool enabled}) =>
       (update(scanFolders)..where((f) => f.id.equals(id))).write(
         ScanFoldersCompanion(enabled: Value(enabled)),

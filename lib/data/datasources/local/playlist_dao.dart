@@ -111,6 +111,11 @@ class PlaylistDao extends DatabaseAccessor<AppDatabase>
         await (delete(playlists)..where((p) => p.id.equals(id))).go();
       });
 
+  Future<void> clearAllPlaylists() => transaction(() async {
+        await delete(playlistSongs).go();
+        await delete(playlists).go();
+      });
+
   /// Creates a copy of [id] with " (Copy)" appended to the name, preserving
   /// all songs in the same order.
   Future<int> duplicatePlaylist(int id) => transaction(() async {

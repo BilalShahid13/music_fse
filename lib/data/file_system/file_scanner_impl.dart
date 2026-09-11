@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/library_file_utils.dart';
 import '../../core/utils/logger.dart';
 import '../../domain/services/file_scanner.dart';
 
@@ -47,10 +48,11 @@ final class FileScannerImpl implements FileScanner {
     try {
       await for (final entity in dir.list(recursive: true, followLinks: false)) {
         if (entity is! File) continue;
+        if (shouldIgnoreLibraryFilePath(entity.path)) continue;
 
         final ext = _extension(entity.path);
         if (AppConstants.supportedAudioExtensions.contains(ext)) {
-          controller.add(entity.path);
+          controller.add(normalizeLibraryFilePath(entity.path));
         }
       }
     } on FileSystemException catch (e) {

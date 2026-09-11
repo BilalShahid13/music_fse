@@ -38,6 +38,7 @@ import '../../domain/usecases/remove_scan_folder.dart';
 import '../../domain/usecases/remove_song_from_playlist.dart';
 import '../../domain/usecases/rename_playlist.dart';
 import '../../domain/usecases/reorder_playlist_song.dart';
+import '../../domain/usecases/reset_library.dart';
 import '../../domain/usecases/save_eq_preset.dart';
 import '../../domain/usecases/save_playback_state.dart';
 import '../../domain/usecases/save_queue.dart';
@@ -210,6 +211,15 @@ AddScanFolder addScanFolder(Ref ref) => AddScanFolder(ref.watch(scanFolderReposi
 
 @riverpod
 RemoveScanFolder removeScanFolder(Ref ref) => RemoveScanFolder(ref.watch(scanFolderRepositoryProvider));
+
+@riverpod
+ResetLibrary resetLibrary(Ref ref) => ResetLibrary(
+      songRepository: ref.watch(songRepositoryProvider),
+      scanFolderRepository: ref.watch(scanFolderRepositoryProvider),
+      playlistRepository: ref.watch(playlistRepositoryProvider),
+      playHistoryRepository: ref.watch(playHistoryRepositoryProvider),
+      recommendationsRepository: ref.watch(recommendationsRepositoryProvider),
+    );
 
 // ---------------------------------------------------------------------------
 // Equalizer presets

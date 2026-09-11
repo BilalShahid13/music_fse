@@ -13,6 +13,9 @@ abstract class ScanFolderRepository {
   /// Removes the scan folder with [id].
   Future<Result<void>> removeFolder(int id);
 
+  /// Removes all scan folders.
+  Future<Result<void>> clearAllFolders();
+
   /// Enables or disables scanning for folder [id].
   Future<Result<void>> toggleEnabled(int id, {required bool enabled});
 

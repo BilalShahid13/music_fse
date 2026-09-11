@@ -10,10 +10,13 @@ import '../../../core/localization/generated/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/entities/playback_state.dart';
 import '../../../domain/entities/song.dart';
+import '../../../platform/xinput/gamepad_scroll_target_mixin.dart';
 import '../../providers/favorites_provider.dart';
 import '../../providers/library_provider.dart';
+import '../../providers/navigation_provider.dart';
 import '../../providers/playback_provider.dart';
 import '../../providers/toast_provider.dart';
+import '../../helpers/active_focus_request.dart';
 import '../../helpers/add_to_playlist_helper.dart';
 import '../../widgets/context_menu.dart';
 import '../../widgets/empty_state.dart';
@@ -31,7 +34,8 @@ class GenreDetailPage extends ConsumerStatefulWidget {
   ConsumerState<GenreDetailPage> createState() => _GenreDetailPageState();
 }
 
-class _GenreDetailPageState extends ConsumerState<GenreDetailPage> {
+class _GenreDetailPageState extends ConsumerState<GenreDetailPage>
+    with GamepadScrollTargetMixin {
   late final FocusNode _playAllFocus;
   late final FocusNode _keyListenerFocusNode;
 
@@ -39,10 +43,9 @@ class _GenreDetailPageState extends ConsumerState<GenreDetailPage> {
   void initState() {
     super.initState();
     _playAllFocus = FocusNode(debugLabel: 'GenreDetail-playAll');
-    _keyListenerFocusNode = FocusNode(debugLabel: 'GenreDetailPage-keyListener')..skipTraversal = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _playAllFocus.requestFocus();
-    });
+    _keyListenerFocusNode = FocusNode(debugLabel: 'GenreDetailPage-keyListener')
+      ..skipTraversal = true;
+    scheduleActiveFocusRequest(state: this, focusNode: _playAllFocus);
   }
 
   @override
@@ -54,7 +57,9 @@ class _GenreDetailPageState extends ConsumerState<GenreDetailPage> {
 
   KeyEventResult _handleKey(KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    if (event.logicalKey == LogicalKeyboardKey.escape || event.logicalKey == LogicalKeyboardKey.gameButtonB) {
+    if (event.logicalKey == LogicalKeyboardKey.escape ||
+        event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+        event.logicalKey == LogicalKeyboardKey.keyB) {
       context.pop();
       return KeyEventResult.handled;
     }
@@ -73,6 +78,9 @@ class _GenreDetailPageState extends ConsumerState<GenreDetailPage> {
       playbackProvider.select((s) => s.currentSong?.id),
     );
     final favorites = ref.watch(favoritesProvider());
+    final currentRoute = ref.watch(navigationProvider);
+
+    syncGamepadScrollTarget(currentRoute.startsWith('/library/genre/'));
 
     return KeyboardListener(
       focusNode: _keyListenerFocusNode,
@@ -84,9 +92,11 @@ class _GenreDetailPageState extends ConsumerState<GenreDetailPage> {
             Expanded(
               child: songsAsync.when(
                 data: (songs) {
-                  final favoriteIds = favorites.value?.map((s) => s.id).toSet() ?? {};
+                  final favoriteIds =
+                      favorites.value?.map((s) => s.id).toSet() ?? {};
 
                   return CustomScrollView(
+                    controller: gamepadScrollController,
                     slivers: [
                       // ── Header ────────────────────────────────────────
                       SliverToBoxAdapter(
@@ -103,10 +113,16 @@ class _GenreDetailPageState extends ConsumerState<GenreDetailPage> {
                                 width: 64,
                                 height: 64,
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: Icon(LucideIcons.tag, size: 28, color: Theme.of(context).colorScheme.primary),
+                                child: Icon(LucideIcons.tag,
+                                    size: 28,
+                                    color:
+                                        Theme.of(context).colorScheme.primary),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
@@ -123,7 +139,8 @@ class _GenreDetailPageState extends ConsumerState<GenreDetailPage> {
                                     const SizedBox(height: 4),
                                     Text(
                                       '${songs.length} song${songs.length == 1 ? '' : 's'}',
-                                      style: tt.bodySmall?.copyWith(color: ext.textTertiary),
+                                      style: tt.bodySmall
+                                          ?.copyWith(color: ext.textTertiary),
                                     ),
                                   ],
                                 ),
@@ -136,7 +153,10 @@ class _GenreDetailPageState extends ConsumerState<GenreDetailPage> {
                                     ? null
                                     : () => ref
                                         .read(playbackProvider.notifier)
-                                        .playSong(songs.first, queue: songs, index: 0, sourceType: QueueSourceType.genre),
+                                        .playSong(songs.first,
+                                            queue: songs,
+                                            index: 0,
+                                            sourceType: QueueSourceType.genre),
                               ),
                               const SizedBox(width: 10),
                               _PlayButton(
@@ -146,7 +166,13 @@ class _GenreDetailPageState extends ConsumerState<GenreDetailPage> {
                                     ? null
                                     : () {
                                         final s = List.of(songs)..shuffle();
-                                        ref.read(playbackProvider.notifier).playSong(s.first, queue: s, index: 0, sourceType: QueueSourceType.genre);
+                                        ref
+                                            .read(playbackProvider.notifier)
+                                            .playSong(s.first,
+                                                queue: s,
+                                                index: 0,
+                                                sourceType:
+                                                    QueueSourceType.genre);
                                       },
                               ),
                             ],
@@ -174,11 +200,19 @@ class _GenreDetailPageState extends ConsumerState<GenreDetailPage> {
                               index: i,
                               isCurrentlyPlaying: song.id == currentSongId,
                               isFavorite: favoriteIds.contains(song.id),
-                              onTap: () =>
-                                  ref.read(playbackProvider.notifier).playSong(song, queue: songs, index: i, sourceType: QueueSourceType.genre),
-                              onContextMenu: () => _showContextMenu(ctx, song, songs, i, favoriteIds.contains(song.id)),
-                              onToggleFavorite: () =>
-                                  ref.read(favoritesProvider().notifier).toggleFavorite(song.id, isFavorite: favoriteIds.contains(song.id)),
+                              onTap: () => ref
+                                  .read(playbackProvider.notifier)
+                                  .playSong(song,
+                                      queue: songs,
+                                      index: i,
+                                      sourceType: QueueSourceType.genre),
+                              onContextMenu: () => _showContextMenu(ctx, song,
+                                  songs, i, favoriteIds.contains(song.id)),
+                              onToggleFavorite: () => ref
+                                  .read(favoritesProvider().notifier)
+                                  .toggleFavorite(song.id,
+                                      isFavorite:
+                                          favoriteIds.contains(song.id)),
                             );
                           },
                         ),
@@ -217,7 +251,8 @@ class _GenreDetailPageState extends ConsumerState<GenreDetailPage> {
         ContextMenuItem(
           label: l10n.ctxPlay,
           icon: LucideIcons.play,
-          onTap: () => ref.read(playbackProvider.notifier).playSong(song, queue: songs, index: index, sourceType: QueueSourceType.genre),
+          onTap: () => ref.read(playbackProvider.notifier).playSong(song,
+              queue: songs, index: index, sourceType: QueueSourceType.genre),
         ),
         ContextMenuItem(
           label: l10n.ctxAddToQueue,
@@ -234,9 +269,12 @@ class _GenreDetailPageState extends ConsumerState<GenreDetailPage> {
         ),
         const ContextMenuSeparator(),
         ContextMenuItem(
-          label: isFavorite ? l10n.ctxRemoveFromFavorites : l10n.ctxAddToFavorites,
+          label:
+              isFavorite ? l10n.ctxRemoveFromFavorites : l10n.ctxAddToFavorites,
           icon: isFavorite ? LucideIcons.heartOff : LucideIcons.heart,
-          onTap: () => ref.read(favoritesProvider().notifier).toggleFavorite(song.id, isFavorite: isFavorite),
+          onTap: () => ref
+              .read(favoritesProvider().notifier)
+              .toggleFavorite(song.id, isFavorite: isFavorite),
         ),
       ],
     );
@@ -297,7 +335,8 @@ class _PlayButtonState extends State<_PlayButton> {
             children: [
               Icon(widget.icon, size: 15, color: ext.textSecondary),
               const SizedBox(width: 7),
-              Text(widget.label, style: tt.labelMedium?.copyWith(color: ext.textPrimary)),
+              Text(widget.label,
+                  style: tt.labelMedium?.copyWith(color: ext.textPrimary)),
             ],
           ),
         ),

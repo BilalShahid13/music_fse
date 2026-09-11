@@ -1,10 +1,12 @@
 import 'dart:io';
 
+import '../entities/song.dart';
 import '../entities/scan_folder.dart';
 import '../repositories/scan_folder_repository.dart';
 import '../repositories/song_repository.dart';
 import '../services/file_scanner.dart';
 import '../services/metadata_extractor.dart';
+import '../../core/utils/library_file_utils.dart';
 import '../../core/utils/logger.dart';
 
 /// Progress snapshot emitted by [ScanLibrary] during an active library scan.
@@ -91,6 +93,13 @@ final class ScanLibrary {
     }
 
     final paths = folders.map((f) => f.path).toList();
+
+    final existingSongsResult = await _songRepository.getAllSongs();
+    final existingSongs = existingSongsResult.valueOrNull ?? const <Song>[];
+    for (final song in existingSongs) {
+      if (!shouldIgnoreLibraryFilePath(song.filePath)) continue;
+      await _songRepository.deleteSong(song.id);
+    }
 
     // 2. Discovery phase — collect all file paths first so we can show an
     //    accurate total. For very large libraries we stream to avoid holding

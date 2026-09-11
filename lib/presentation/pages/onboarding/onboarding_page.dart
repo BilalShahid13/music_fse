@@ -11,6 +11,7 @@ import '../../../core/constants/app_sizes.dart';
 import '../../../core/localization/generated/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/repositories/settings_repository.dart';
+import '../../helpers/active_focus_request.dart';
 import '../../providers/repository_providers.dart';
 import '../../providers/scan_folder_provider.dart';
 import '../../providers/scan_provider.dart';
@@ -36,6 +37,8 @@ class OnboardingPage extends ConsumerStatefulWidget {
 class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   int _step = 0;
   static const int _totalSteps = 4;
+  bool _hasStartedOnboardingScan = false;
+  bool _isStartingOnboardingScan = false;
 
   /// Focus nodes for the primary action on each step.
   late final List<FocusNode> _stepFocusNodes;
@@ -44,15 +47,15 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   @override
   void initState() {
     super.initState();
-    _stepFocusNodes = List.generate(_totalSteps, (i) => FocusNode(debugLabel: 'Onboard-$i'));
-    _keyListenerFocusNode = FocusNode(debugLabel: 'OnboardingPage-keyListener')..skipTraversal = true;
+    _stepFocusNodes =
+        List.generate(_totalSteps, (i) => FocusNode(debugLabel: 'Onboard-$i'));
+    _keyListenerFocusNode = FocusNode(debugLabel: 'OnboardingPage-keyListener')
+      ..skipTraversal = true;
     _requestStepFocus();
   }
 
   void _requestStepFocus() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _stepFocusNodes[_step].requestFocus();
-    });
+    scheduleActiveFocusRequest(state: this, focusNode: _stepFocusNodes[_step]);
   }
 
   @override
@@ -66,7 +69,15 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
   void _nextStep() {
     if (_step < _totalSteps - 1) {
-      setState(() => _step++);
+      final nextStep = _step + 1;
+      setState(() => _step = nextStep);
+      if (nextStep == 3) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _startOnboardingScanIfNeeded();
+          }
+        });
+      }
       _requestStepFocus();
     }
   }
@@ -81,15 +92,33 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   Future<void> _completeOnboarding() async {
     final repo = ref.read(settingsRepositoryProvider);
     await repo.setBool(SettingsKeys.onboardingComplete, value: true);
-    // Kick off the initial library scan in the background before navigating.
-    // unawaited — the scan runs independently; the user can browse immediately.
-    ref.read(scanProvider.notifier).startScan();
     if (mounted) context.go('/home');
+  }
+
+  Future<void> _startOnboardingScanIfNeeded() async {
+    if (_hasStartedOnboardingScan || _isStartingOnboardingScan) {
+      return;
+    }
+
+    _isStartingOnboardingScan = true;
+    try {
+      final folders = await ref.read(scanFoldersProvider.future);
+      if (!mounted || folders.isEmpty) {
+        return;
+      }
+
+      _hasStartedOnboardingScan = true;
+      await ref.read(scanProvider.notifier).startScan();
+    } finally {
+      _isStartingOnboardingScan = false;
+    }
   }
 
   KeyEventResult _handleKey(KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    if (event.logicalKey == LogicalKeyboardKey.escape || event.logicalKey == LogicalKeyboardKey.gameButtonB) {
+    if (event.logicalKey == LogicalKeyboardKey.escape ||
+        event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+        event.logicalKey == LogicalKeyboardKey.keyB) {
       if (_step > 0) {
         _prevStep();
         return KeyEventResult.handled;
@@ -108,9 +137,11 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         backgroundColor: ext.bgDeep,
         body: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: AppConstants.onboardingCardWidth),
+            constraints: const BoxConstraints(
+                maxWidth: AppConstants.onboardingCardWidth),
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: AppConstants.pageTransitionMs),
+              duration:
+                  const Duration(milliseconds: AppConstants.pageTransitionMs),
               transitionBuilder: (child, anim) => FadeTransition(
                 opacity: anim,
                 child: SlideTransition(
@@ -235,7 +266,8 @@ class _WelcomeStep extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(LucideIcons.music, size: 56, color: Theme.of(context).colorScheme.primary),
+        Icon(LucideIcons.music,
+            size: 56, color: Theme.of(context).colorScheme.primary),
         const SizedBox(height: 20),
         Text(
           l10n.appName,
@@ -255,13 +287,7 @@ class _WelcomeStep extends StatelessWidget {
         FilledButton(
           focusNode: focusNode,
           onPressed: onNext,
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(AppConstants.minFocusableSize),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppConstants.btnRadius),
-            ),
-          ),
-          child: Text('Get Started', style: tt.labelLarge?.copyWith(color: Colors.white)),
+          child: const Text('Get Started'),
         ),
       ],
     );
@@ -315,16 +341,20 @@ class _AddFoldersStep extends ConsumerWidget {
             constraints: const BoxConstraints(maxHeight: 180),
             decoration: BoxDecoration(
               color: context.appTheme.bgInput,
-              borderRadius: BorderRadius.circular(AppSizes.of(context).cardRadiusSm),
+              borderRadius:
+                  BorderRadius.circular(AppSizes.of(context).cardRadiusSm),
               border: Border.all(color: ext.borderSubtle),
             ),
             child: ListView.separated(
               shrinkWrap: true,
               itemCount: folders.length,
-              separatorBuilder: (_, __) => Divider(height: 1, color: ext.borderSubtle),
+              separatorBuilder: (_, __) =>
+                  Divider(height: 1, color: ext.borderSubtle),
               itemBuilder: (ctx, i) => _FolderTile(
                 path: folders[i].path,
-                onRemove: () => ref.read(scanFoldersProvider.notifier).removeFolder(folders[i].id),
+                onRemove: () => ref
+                    .read(scanFoldersProvider.notifier)
+                    .removeFolder(folders[i].id),
               ),
             ),
           ),
@@ -342,16 +372,7 @@ class _AddFoldersStep extends ConsumerWidget {
             }
           },
           icon: const Icon(LucideIcons.folderOpen),
-          label: Text(
-            'Browse for Folder',
-            style: tt.labelLarge?.copyWith(color: ext.textPrimary),
-          ),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(AppConstants.minFocusableSize),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppConstants.btnRadius),
-            ),
-          ),
+          label: const Text('Browse for Folder'),
         ),
 
         const SizedBox(height: 20),
@@ -476,11 +497,15 @@ class _ThemeStep extends ConsumerWidget {
         Center(
           child: GestureDetector(
             onTap: () async {
-              final color = await showColorPickerDialog(
+              final selection = await showColorPickerDialog(
                 context,
                 initial: themeState.accentColor,
+                initialTextColor: themeState.accentTextColor,
               );
-              if (color != null) await notifier.setAccentColor(color);
+              if (selection != null) {
+                await notifier.setAccentColor(selection.color);
+                await notifier.setAccentTextColor(selection.textColor);
+              }
             },
             child: Tooltip(
               message: 'Change accent color',
@@ -539,7 +564,7 @@ class _ThemeChip extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? accent.withOpacity(0.15) : ext.bgInput,
+          color: selected ? accent.withValues(alpha: 0.15) : ext.bgInput,
           borderRadius: BorderRadius.circular(AppConstants.btnRadius),
           border: Border.all(
             color: selected ? accent : ext.borderSubtle,
@@ -584,11 +609,48 @@ class _DoneStep extends ConsumerStatefulWidget {
 }
 
 class _DoneStepState extends ConsumerState<_DoneStep> {
+  late final FocusNode _backFocus;
+  bool? _lastWaitingForScan;
+
+  @override
+  void initState() {
+    super.initState();
+    _backFocus = FocusNode(debugLabel: 'Onboard-3-back');
+  }
+
+  @override
+  void dispose() {
+    _backFocus.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final ext = context.appTheme;
     final tt = Theme.of(context).textTheme;
     final accent = Theme.of(context).colorScheme.primary;
+    final folders = ref.watch(scanFoldersProvider).value ?? const [];
+    final scanState = ref.watch(scanProvider);
+    final hasFolders = folders.isNotEmpty;
+    final isWaitingForScan = hasFolders && !scanState.isComplete;
+    final targetFocus = isWaitingForScan ? _backFocus : widget.focusNode;
+    final progressValue =
+        scanState.total > 0 ? scanState.progressFraction : null;
+    final progressLabel = scanState.total > 0
+        ? '${scanState.processed} of ${scanState.total} tracks imported'
+        : (scanState.found > 0
+            ? '${scanState.found} tracks found'
+            : 'Preparing scan...');
+
+    if (_lastWaitingForScan != isWaitingForScan) {
+      _lastWaitingForScan = isWaitingForScan;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !targetFocus.canRequestFocus) {
+          return;
+        }
+        targetFocus.requestFocus();
+      });
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -597,7 +659,9 @@ class _DoneStepState extends ConsumerState<_DoneStep> {
         Icon(LucideIcons.circleCheck, size: 56, color: accent),
         const SizedBox(height: 20),
         Text(
-          "You're all set!",
+          hasFolders && scanState.isComplete
+              ? 'Scan complete'
+              : "You're all set!",
           style: tt.headlineMedium?.copyWith(
             color: ext.textPrimary,
             fontWeight: FontWeight.w700,
@@ -606,33 +670,57 @@ class _DoneStepState extends ConsumerState<_DoneStep> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Music FSE will now scan your folders and import your library. '
-          'This happens in the background — you can start browsing right away.',
+          !hasFolders
+              ? 'No folders were selected during setup. You can finish onboarding now and add folders later in Settings.'
+              : (scanState.isComplete
+                  ? 'Your selected folders have been scanned and your library is ready.'
+                  : 'Music FSE is scanning your selected folders and importing your library.'),
           style: tt.bodyMedium?.copyWith(color: ext.textSecondary),
           textAlign: TextAlign.center,
         ),
+        if (hasFolders) ...[
+          const SizedBox(height: 24),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              minHeight: 10,
+              value: progressValue,
+              backgroundColor: ext.bgInput,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            progressLabel,
+            style: tt.bodySmall?.copyWith(color: ext.textSecondary),
+            textAlign: TextAlign.center,
+          ),
+          if (scanState.currentFile != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              scanState.currentFile!,
+              style: tt.bodySmall?.copyWith(color: ext.textTertiary),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
         const SizedBox(height: 32),
         FilledButton(
           focusNode: widget.focusNode,
-          onPressed: widget.onFinish,
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(AppConstants.minFocusableSize),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppConstants.btnRadius),
-            ),
-          ),
+          onPressed: isWaitingForScan ? null : widget.onFinish,
           child: Text(
-            'Start Using Music FSE',
-            style: tt.labelLarge?.copyWith(color: Colors.white),
+            hasFolders
+                ? (scanState.isComplete
+                    ? 'Start Using Music FSE'
+                    : 'Scanning Library...')
+                : 'Start Using Music FSE',
           ),
         ),
         const SizedBox(height: 12),
         TextButton(
+          focusNode: _backFocus,
           onPressed: widget.onBack,
-          child: Text(
-            'Back',
-            style: tt.bodyMedium?.copyWith(color: ext.textTertiary),
-          ),
+          child: const Text('Back'),
         ),
       ],
     );
@@ -657,32 +745,18 @@ class _NavButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ext = context.appTheme;
-    final tt = Theme.of(context).textTheme;
     return Row(
       children: [
         OutlinedButton(
           onPressed: onBack,
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(88, AppConstants.minFocusableSize),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppConstants.btnRadius),
-            ),
-          ),
-          child: Text('Back', style: tt.labelLarge?.copyWith(color: ext.textSecondary)),
+          child: const Text('Back'),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: FilledButton(
             focusNode: nextFocusNode,
             onPressed: onNext,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(AppConstants.minFocusableSize),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppConstants.btnRadius),
-              ),
-            ),
-            child: Text(nextLabel, style: tt.labelLarge?.copyWith(color: Colors.white)),
+            child: Text(nextLabel),
           ),
         ),
       ],

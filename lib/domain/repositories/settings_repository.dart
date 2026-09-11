@@ -26,7 +26,10 @@ abstract class SettingsRepository {
 /// risks typo bugs; centralise them here.
 abstract final class SettingsKeys {
   static const String accentColor = 'accent_color';
+  static const String accentTextColor = 'accent_text_color';
   static const String themeMode = 'theme_mode';
+  static const String appFont = 'app_font';
+  static const String uiScale = 'ui_scale';
   static const String volume = 'volume';
   static const String crossfadeSeconds = 'crossfade_seconds';
   static const String eqEnabled = 'eq_enabled';
@@ -50,8 +53,11 @@ abstract final class SettingsKeys {
 
   // Gamepad / input
   static const String gamepadEnabled = 'gamepad_enabled';
+  static const String navSoundEnabled = 'nav_sound_enabled';
   static const String navSoundLevel = 'nav_sound_level';
   static const String animateFocusScrolling = 'animate_focus_scrolling';
+  static const String miniPlayerArtBackground = 'mini_player_art_background';
+  static const String wideNavRailExpanded = 'wide_nav_rail_expanded';
 
   // System integration
   static const String closeToTray = 'close_to_tray';

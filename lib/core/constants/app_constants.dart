@@ -151,7 +151,8 @@ abstract final class AppConstants {
   // Settings
   // ---------------------------------------------------------------------------
   static const double colorChipSize = 28.0;
-  static const double defaultNavSoundLevel = 0.35;
+  static const bool defaultNavSoundEnabled = false;
+  static const double defaultNavSoundLevel = 1.0;
 
   // ---------------------------------------------------------------------------
   // Equalizer

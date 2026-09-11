@@ -1670,6 +1670,47 @@ final class RemoveScanFolderProvider extends $FunctionalProvider<
 
 String _$removeScanFolderHash() => r'8465c4c999a99a4bd07f4646fae86e762fb36769';
 
+@ProviderFor(resetLibrary)
+final resetLibraryProvider = ResetLibraryProvider._();
+
+final class ResetLibraryProvider
+    extends $FunctionalProvider<ResetLibrary, ResetLibrary, ResetLibrary>
+    with $Provider<ResetLibrary> {
+  ResetLibraryProvider._()
+      : super(
+          from: null,
+          argument: null,
+          retry: null,
+          name: r'resetLibraryProvider',
+          isAutoDispose: true,
+          dependencies: null,
+          $allTransitiveDependencies: null,
+        );
+
+  @override
+  String debugGetCreateSourceHash() => _$resetLibraryHash();
+
+  @$internal
+  @override
+  $ProviderElement<ResetLibrary> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  ResetLibrary create(Ref ref) {
+    return resetLibrary(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ResetLibrary value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ResetLibrary>(value),
+    );
+  }
+}
+
+String _$resetLibraryHash() => r'053989d1f9436e0e88b2701c588f15c20140e926';
+
 @ProviderFor(getEqPresets)
 final getEqPresetsProvider = GetEqPresetsProvider._();
 

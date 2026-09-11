@@ -2,7 +2,11 @@
 
 #include <flutter_windows.h>
 #include <io.h>
+#include <propkey.h>
+#include <propvarutil.h>
+#include <propsys.h>
 #include <stdio.h>
+#include <shlobj.h>
 #include <windows.h>
 
 #include <iostream>
@@ -11,6 +15,63 @@ namespace {
 
 constexpr const wchar_t kFlutterWindowClassName[] =
   L"FLUTTER_RUNNER_WIN32_WINDOW";
+
+std::wstring GetExecutablePath() {
+  std::wstring executable_path(MAX_PATH, L'\0');
+  DWORD path_length = ::GetModuleFileNameW(
+      nullptr, executable_path.data(), static_cast<DWORD>(executable_path.size()));
+  if (path_length == 0 || path_length == executable_path.size()) {
+    return std::wstring();
+  }
+
+  executable_path.resize(path_length);
+  return executable_path;
+}
+
+std::wstring GetExecutableDirectory(const std::wstring& executable_path) {
+  const auto separator_index = executable_path.find_last_of(L"\\/");
+  if (separator_index == std::wstring::npos) {
+    return std::wstring();
+  }
+
+  return executable_path.substr(0, separator_index);
+}
+
+std::wstring GetStartMenuShortcutPath(const wchar_t* app_name) {
+  PWSTR programs_path = nullptr;
+  const HRESULT get_folder_result = ::SHGetKnownFolderPath(
+      FOLDERID_Programs, KF_FLAG_CREATE, nullptr, &programs_path);
+  if (FAILED(get_folder_result) || programs_path == nullptr) {
+    return std::wstring();
+  }
+
+  std::wstring shortcut_path(programs_path);
+  ::CoTaskMemFree(programs_path);
+  shortcut_path.append(L"\\");
+  shortcut_path.append(app_name);
+  shortcut_path.append(L".lnk");
+  return shortcut_path;
+}
+
+bool SetShellLinkStringProperty(IPropertyStore* property_store,
+                                REFPROPERTYKEY key,
+                                const std::wstring& value) {
+  if (property_store == nullptr || value.empty()) {
+    return false;
+  }
+
+  PROPVARIANT property_value;
+  ::PropVariantInit(&property_value);
+  const HRESULT init_result = ::InitPropVariantFromString(
+      value.c_str(), &property_value);
+  if (FAILED(init_result)) {
+    return false;
+  }
+
+  const HRESULT set_result = property_store->SetValue(key, property_value);
+  ::PropVariantClear(&property_value);
+  return SUCCEEDED(set_result);
+}
 
 }  // namespace
 
@@ -136,4 +197,65 @@ void FocusExistingFlutterWindow() {
 
   ::ShowWindow(hwnd, SW_RESTORE);
   ::SetForegroundWindow(hwnd);
+}
+
+void EnsureAppUserModelShellLink(const wchar_t* app_id,
+                                 const wchar_t* app_name) {
+  if (app_id == nullptr || *app_id == L'\0' ||
+      app_name == nullptr || *app_name == L'\0') {
+    return;
+  }
+
+  const std::wstring executable_path = GetExecutablePath();
+  const std::wstring shortcut_path = GetStartMenuShortcutPath(app_name);
+  if (executable_path.empty() || shortcut_path.empty()) {
+    return;
+  }
+
+  IShellLinkW* shell_link = nullptr;
+  HRESULT result = ::CoCreateInstance(
+      CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER,
+      IID_PPV_ARGS(&shell_link));
+  if (FAILED(result) || shell_link == nullptr) {
+    return;
+  }
+
+  shell_link->SetPath(executable_path.c_str());
+  shell_link->SetDescription(app_name);
+  shell_link->SetIconLocation(executable_path.c_str(), 0);
+
+  const std::wstring working_directory =
+      GetExecutableDirectory(executable_path);
+  if (!working_directory.empty()) {
+    shell_link->SetWorkingDirectory(working_directory.c_str());
+  }
+
+  IPropertyStore* property_store = nullptr;
+  result = shell_link->QueryInterface(IID_PPV_ARGS(&property_store));
+  if (SUCCEEDED(result) && property_store != nullptr) {
+    SetShellLinkStringProperty(property_store, PKEY_AppUserModel_ID, app_id);
+    SetShellLinkStringProperty(
+        property_store,
+        PKEY_AppUserModel_RelaunchDisplayNameResource,
+        app_name);
+    SetShellLinkStringProperty(
+        property_store,
+        PKEY_AppUserModel_RelaunchCommand,
+        L"\"" + executable_path + L"\"");
+    SetShellLinkStringProperty(
+        property_store,
+        PKEY_AppUserModel_RelaunchIconResource,
+        executable_path + L",0");
+    property_store->Commit();
+    property_store->Release();
+  }
+
+  IPersistFile* persist_file = nullptr;
+  result = shell_link->QueryInterface(IID_PPV_ARGS(&persist_file));
+  if (SUCCEEDED(result) && persist_file != nullptr) {
+    persist_file->Save(shortcut_path.c_str(), TRUE);
+    persist_file->Release();
+  }
+
+  shell_link->Release();
 }

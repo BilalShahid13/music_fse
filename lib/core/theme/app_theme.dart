@@ -1,13 +1,17 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../constants/app_enums.dart';
 import '../constants/app_constants.dart';
 
 // =============================================================================
-// AppThemeExtension — custom colors not covered by ColorScheme
+// AppThemeExtension — custom semantic tokens not covered by ColorScheme
 // =============================================================================
 
-/// Holds all custom semantic color tokens for the app.
+/// Holds custom semantic theme tokens not modeled directly by Flutter's
+/// built-in color and text theme buckets.
 ///
 /// Accessed via [AppThemeContext.appTheme] — never via direct field access on
 /// [ThemeData].
@@ -30,6 +34,7 @@ final class AppThemeExtension extends ThemeExtension<AppThemeExtension> {
     required this.btnX,
     required this.btnY,
     required this.destructive,
+    required this.brandWordmark,
   });
 
   // Background layers (darkest → lightest)
@@ -61,6 +66,9 @@ final class AppThemeExtension extends ThemeExtension<AppThemeExtension> {
   // Destructive actions (delete, error)
   final Color destructive;
 
+  // Brand text treatment for the shell rail wordmark.
+  final TextStyle brandWordmark;
+
   @override
   AppThemeExtension copyWith({
     Color? bgDeep,
@@ -80,6 +88,7 @@ final class AppThemeExtension extends ThemeExtension<AppThemeExtension> {
     Color? btnX,
     Color? btnY,
     Color? destructive,
+    TextStyle? brandWordmark,
   }) {
     return AppThemeExtension(
       bgDeep: bgDeep ?? this.bgDeep,
@@ -99,6 +108,7 @@ final class AppThemeExtension extends ThemeExtension<AppThemeExtension> {
       btnX: btnX ?? this.btnX,
       btnY: btnY ?? this.btnY,
       destructive: destructive ?? this.destructive,
+      brandWordmark: brandWordmark ?? this.brandWordmark,
     );
   }
 
@@ -123,6 +133,9 @@ final class AppThemeExtension extends ThemeExtension<AppThemeExtension> {
       btnX: Color.lerp(btnX, other.btnX, t)!,
       btnY: Color.lerp(btnY, other.btnY, t)!,
       destructive: Color.lerp(destructive, other.destructive, t)!,
+      brandWordmark:
+          TextStyle.lerp(brandWordmark, other.brandWordmark, t) ??
+          brandWordmark,
     );
   }
 }
@@ -157,7 +170,7 @@ abstract final class AppTheme {
   static const Color _darkBgInput = Color(0xFF111825);
   static const Color _darkTextPrimary = Color(0xFFFFFFFF);
   static const Color _darkTextSecondary = Color(0xFF9EA3B0);
-  static const Color _darkTextTertiary = Color(0xFF464B58);
+  static const Color _darkTextTertiary = Color(0xFF697385);
   static const Color _darkBorderSubtle = Color(0x0DFFFFFF); // rgba(255,255,255,0.05)
   static const Color _darkBorderCard = Color(0x0AFFFFFF); // rgba(255,255,255,0.04)
 
@@ -195,20 +208,43 @@ abstract final class AppTheme {
   /// [brightness] controls dark/light mode.
   static ThemeData buildTheme({
     required Color accentColor,
+    required AccentTextColorSetting accentTextColor,
+    required AppFontSetting appFont,
     required Brightness brightness,
+    double uiScale = 1.0,
   }) {
     final isDark = brightness == Brightness.dark;
 
     final ext = isDark ? _darkExtension(accentColor) : _lightExtension(accentColor);
-    final colorScheme = isDark ? _darkColorScheme(accentColor) : _lightColorScheme(accentColor);
+    final onAccent = resolveOnAccentColor(accentColor, accentTextColor);
+    final colorScheme = isDark
+        ? _darkColorScheme(accentColor, onAccent: onAccent)
+        : _lightColorScheme(accentColor, onAccent: onAccent);
 
-    final textTheme = _buildTextTheme(colorScheme);
+    final textTheme = _buildTextTheme(
+      colorScheme,
+      appFont: appFont,
+      uiScale: uiScale,
+    );
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: colorScheme,
       textTheme: textTheme,
+      switchTheme: _switchTheme(colorScheme, ext),
+      filledButtonTheme: FilledButtonThemeData(
+        style: _accentButtonStyle(colorScheme),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: _accentButtonStyle(colorScheme),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: _accentButtonStyle(colorScheme, compact: true),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: _accentButtonStyle(colorScheme),
+      ),
       // No ink splash — this is a gamepad app.
       splashFactory: NoSplash.splashFactory,
       highlightColor: Colors.transparent,
@@ -226,16 +262,156 @@ abstract final class AppTheme {
     );
   }
 
+  static SwitchThemeData _switchTheme(
+    ColorScheme colorScheme,
+    AppThemeExtension ext,
+  ) {
+    return SwitchThemeData(
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      trackOutlineWidth: const WidgetStatePropertyAll(1.5),
+      overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+      thumbColor: WidgetStateProperty.resolveWith((states) {
+        final isDisabled = states.contains(WidgetState.disabled);
+        final isSelected = states.contains(WidgetState.selected);
+
+        if (isDisabled) {
+          return isSelected
+              ? colorScheme.onPrimary.withValues(alpha: 0.45)
+              : ext.textTertiary.withValues(alpha: 0.5);
+        }
+
+        return isSelected ? colorScheme.primary : colorScheme.onSurface;
+      }),
+      trackColor: WidgetStateProperty.resolveWith((states) {
+        final isDisabled = states.contains(WidgetState.disabled);
+        final isSelected = states.contains(WidgetState.selected);
+
+        if (isDisabled) {
+          return isSelected
+              ? colorScheme.primary.withValues(alpha: 0.16)
+              : ext.bgInput.withValues(alpha: 0.7);
+        }
+
+        return isSelected ? Colors.transparent : ext.bgInput;
+      }),
+      trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+        final isDisabled = states.contains(WidgetState.disabled);
+        final isSelected = states.contains(WidgetState.selected);
+
+        if (isDisabled) {
+          return ext.borderSubtle;
+        }
+
+        return isSelected
+            ? colorScheme.primary
+            : ext.textTertiary.withValues(alpha: 0.7);
+      }),
+    );
+  }
+
+  static ButtonStyle _accentButtonStyle(
+    ColorScheme colorScheme, {
+    bool compact = false,
+  }) {
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppConstants.btnRadius),
+    );
+
+    return ButtonStyle(
+      minimumSize: WidgetStatePropertyAll(
+        compact
+            ? const Size(48, AppConstants.minFocusableSize)
+            : const Size(88, AppConstants.minFocusableSize),
+      ),
+      padding: WidgetStatePropertyAll(
+        compact
+            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8)
+            : const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+      shape: WidgetStatePropertyAll(shape),
+      side: WidgetStateProperty.resolveWith((states) {
+        final borderColor = states.contains(WidgetState.disabled)
+            ? colorScheme.outlineVariant
+            : colorScheme.primary;
+        return BorderSide(color: borderColor, width: 1.5);
+      }),
+      elevation: const WidgetStatePropertyAll(0),
+      shadowColor: const WidgetStatePropertyAll(Colors.transparent),
+      surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+      backgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) {
+          return Colors.transparent;
+        }
+        if (states.contains(WidgetState.focused) ||
+            states.contains(WidgetState.pressed)) {
+          return colorScheme.primary;
+        }
+        return Colors.transparent;
+      }),
+      foregroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) {
+          return colorScheme.outlineVariant;
+        }
+        if (states.contains(WidgetState.focused) ||
+            states.contains(WidgetState.pressed)) {
+          return colorScheme.onPrimary;
+        }
+        return colorScheme.primary;
+      }),
+      overlayColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.pressed)) {
+          return colorScheme.onPrimary.withValues(alpha: 0.14);
+        }
+        return null;
+      }),
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // ColorScheme
   // ---------------------------------------------------------------------------
 
-  static ColorScheme _darkColorScheme(Color accent) => ColorScheme(
+  static Color resolveOnAccentColor(
+    Color accent,
+    AccentTextColorSetting accentTextColor,
+  ) {
+    switch (accentTextColor) {
+      case AccentTextColorSetting.dark:
+        return Colors.black;
+      case AccentTextColorSetting.light:
+        return Colors.white;
+      case AccentTextColorSetting.auto:
+        return _bestOnAccent(accent);
+    }
+  }
+
+  static Color _bestOnAccent(Color accent) {
+    const black = Colors.black;
+    const white = Colors.white;
+
+    final blackContrast = _contrastRatio(accent, black);
+    final whiteContrast = _contrastRatio(accent, white);
+
+    return blackContrast >= whiteContrast ? black : white;
+  }
+
+  static double _contrastRatio(Color a, Color b) {
+    final luminanceA = a.computeLuminance();
+    final luminanceB = b.computeLuminance();
+    final lighter = math.max(luminanceA, luminanceB);
+    final darker = math.min(luminanceA, luminanceB);
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+
+  static ColorScheme _darkColorScheme(
+    Color accent, {
+    required Color onAccent,
+  }) => ColorScheme(
         brightness: Brightness.dark,
         primary: accent,
-        onPrimary: Colors.black,
+        onPrimary: onAccent,
         secondary: accent,
-        onSecondary: Colors.black,
+        onSecondary: onAccent,
         surface: _darkBgSurface,
         onSurface: _darkTextPrimary,
         surfaceContainerHighest: _darkBgCard,
@@ -248,12 +424,15 @@ abstract final class AppTheme {
         onError: Colors.white,
       );
 
-  static ColorScheme _lightColorScheme(Color accent) => ColorScheme(
+  static ColorScheme _lightColorScheme(
+    Color accent, {
+    required Color onAccent,
+  }) => ColorScheme(
         brightness: Brightness.light,
         primary: accent,
-        onPrimary: Colors.white,
+      onPrimary: onAccent,
         secondary: accent,
-        onSecondary: Colors.white,
+      onSecondary: onAccent,
         surface: _lightBgSurface,
         onSurface: _lightTextPrimary,
         surfaceContainerHighest: _lightBgCard,
@@ -270,82 +449,177 @@ abstract final class AppTheme {
   // TextTheme
   // ---------------------------------------------------------------------------
 
-  static TextTheme _buildTextTheme(ColorScheme scheme) {
-    // Base text themes from Google Fonts (Inter).
-    final base = GoogleFonts.interTextTheme().copyWith(
+  static TextTheme _buildTextTheme(
+    ColorScheme scheme, {
+    required AppFontSetting appFont,
+    double uiScale = 1.0,
+  }) {
+    final base = _fontTextTheme(appFont).copyWith(
       // Display — page titles (28sp Bold)
-      displayLarge: GoogleFonts.inter(
+      displayLarge: _fontStyle(
+        appFont,
         fontSize: 28,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
         letterSpacing: -0.5,
       ),
       // Headline — section headers (24sp SemiBold)
-      headlineLarge: GoogleFonts.inter(
+      headlineLarge: _fontStyle(
+        appFont,
         fontSize: 24,
         fontWeight: FontWeight.w600,
         color: scheme.onSurface,
         letterSpacing: -0.3,
       ),
       // Title Large — Now Playing title (22sp SemiBold)
-      titleLarge: GoogleFonts.inter(
+      titleLarge: _fontStyle(
+        appFont,
         fontSize: 22,
         fontWeight: FontWeight.w600,
         color: scheme.onSurface,
         letterSpacing: -0.2,
       ),
       // Title Medium — section titles, dialog titles (18sp SemiBold)
-      titleMedium: GoogleFonts.inter(
+      titleMedium: _fontStyle(
+        appFont,
         fontSize: 18,
         fontWeight: FontWeight.w600,
         color: scheme.onSurface,
       ),
       // Title Small — card titles, song titles (14sp SemiBold)
-      titleSmall: GoogleFonts.inter(
+      titleSmall: _fontStyle(
+        appFont,
         fontSize: 14,
         fontWeight: FontWeight.w600,
         color: scheme.onSurface,
       ),
       // Body Large — primary body text (16sp Regular)
-      bodyLarge: GoogleFonts.inter(
+      bodyLarge: _fontStyle(
+        appFont,
         fontSize: 16,
         fontWeight: FontWeight.w400,
         color: scheme.onSurface,
       ),
       // Body Medium — default body (14sp Regular)
-      bodyMedium: GoogleFonts.inter(
+      bodyMedium: _fontStyle(
+        appFont,
         fontSize: 14,
         fontWeight: FontWeight.w400,
         color: scheme.onSurface,
       ),
       // Body Small — captions, secondary meta (13sp Regular)
-      bodySmall: GoogleFonts.inter(
+      bodySmall: _fontStyle(
+        appFont,
         fontSize: 13,
         fontWeight: FontWeight.w400,
         color: scheme.onSurfaceVariant,
       ),
       // Label Large — buttons, nav items (14sp Medium)
-      labelLarge: GoogleFonts.inter(
+      labelLarge: _fontStyle(
+        appFont,
         fontSize: 14,
         fontWeight: FontWeight.w500,
         color: scheme.onSurface,
       ),
       // Label Medium — subtitles, durations (12sp Medium)
-      labelMedium: GoogleFonts.inter(
+      labelMedium: _fontStyle(
+        appFont,
         fontSize: 12,
         fontWeight: FontWeight.w500,
         color: scheme.onSurfaceVariant,
       ),
       // Label Small — section headers uppercase (11sp SemiBold)
-      labelSmall: GoogleFonts.inter(
+      labelSmall: _fontStyle(
+        appFont,
         fontSize: 11,
         fontWeight: FontWeight.w600,
         color: scheme.onSurfaceVariant,
         letterSpacing: 1.0,
       ),
     );
-    return base;
+    return _scaleTextTheme(base, uiScale);
   }
+
+  static TextTheme _fontTextTheme(AppFontSetting appFont) => switch (appFont) {
+        AppFontSetting.inter => GoogleFonts.interTextTheme(),
+        AppFontSetting.poppins => GoogleFonts.poppinsTextTheme(),
+        AppFontSetting.roboto => GoogleFonts.robotoTextTheme(),
+        AppFontSetting.nunitoSans => GoogleFonts.nunitoSansTextTheme(),
+      };
+
+  static TextStyle _fontStyle(
+    AppFontSetting appFont, {
+    double? fontSize,
+    FontWeight? fontWeight,
+    Color? color,
+    double? letterSpacing,
+  }) =>
+      switch (appFont) {
+        AppFontSetting.inter => GoogleFonts.inter(
+            fontSize: fontSize,
+            fontWeight: fontWeight,
+            color: color,
+            letterSpacing: letterSpacing,
+          ),
+        AppFontSetting.poppins => GoogleFonts.poppins(
+            fontSize: fontSize,
+            fontWeight: fontWeight,
+            color: color,
+            letterSpacing: letterSpacing,
+          ),
+        AppFontSetting.roboto => GoogleFonts.roboto(
+            fontSize: fontSize,
+            fontWeight: fontWeight,
+            color: color,
+            letterSpacing: letterSpacing,
+          ),
+        AppFontSetting.nunitoSans => GoogleFonts.nunitoSans(
+            fontSize: fontSize,
+            fontWeight: fontWeight,
+            color: color,
+            letterSpacing: letterSpacing,
+          ),
+      };
+
+  static TextTheme _scaleTextTheme(TextTheme theme, double scaleFactor) {
+    if (scaleFactor == 1.0) {
+      return theme;
+    }
+
+    TextStyle? scaleStyle(TextStyle? style) {
+      final fontSize = style?.fontSize;
+      if (style == null || fontSize == null) {
+        return style;
+      }
+      return style.copyWith(fontSize: fontSize * scaleFactor);
+    }
+
+    return theme.copyWith(
+      displayLarge: scaleStyle(theme.displayLarge),
+      displayMedium: scaleStyle(theme.displayMedium),
+      displaySmall: scaleStyle(theme.displaySmall),
+      headlineLarge: scaleStyle(theme.headlineLarge),
+      headlineMedium: scaleStyle(theme.headlineMedium),
+      headlineSmall: scaleStyle(theme.headlineSmall),
+      titleLarge: scaleStyle(theme.titleLarge),
+      titleMedium: scaleStyle(theme.titleMedium),
+      titleSmall: scaleStyle(theme.titleSmall),
+      bodyLarge: scaleStyle(theme.bodyLarge),
+      bodyMedium: scaleStyle(theme.bodyMedium),
+      bodySmall: scaleStyle(theme.bodySmall),
+      labelLarge: scaleStyle(theme.labelLarge),
+      labelMedium: scaleStyle(theme.labelMedium),
+      labelSmall: scaleStyle(theme.labelSmall),
+    );
+  }
+
+  static TextStyle _brandWordmarkStyle(Color color) => GoogleFonts.spaceGrotesk(
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
+        color: color,
+        letterSpacing: -0.2,
+        height: 1.0,
+      );
 
   // ---------------------------------------------------------------------------
   // AppThemeExtension instances
@@ -369,6 +643,7 @@ abstract final class AppTheme {
         btnX: _btnX,
         btnY: _btnY,
         destructive: _destructive,
+        brandWordmark: _brandWordmarkStyle(_darkTextPrimary),
       );
 
   static AppThemeExtension _lightExtension(Color accent) => AppThemeExtension(
@@ -389,5 +664,6 @@ abstract final class AppTheme {
         btnX: _btnX,
         btnY: _btnY,
         destructive: _destructive,
+        brandWordmark: _brandWordmarkStyle(_lightTextPrimary),
       );
 }

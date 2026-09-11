@@ -96,6 +96,17 @@ final class PlaylistRepositoryImpl implements PlaylistRepository {
   }
 
   @override
+  Future<Result<void>> clearAllPlaylists() async {
+    try {
+      await _dao.clearAllPlaylists();
+      return const Result.success(null);
+    } catch (e, st) {
+      AppLogger.error('clearAllPlaylists failed', tag: 'PlaylistRepo', error: e, stackTrace: st);
+      return Result.failure(AppError.database(message: e.toString()));
+    }
+  }
+
+  @override
   Future<Result<void>> duplicatePlaylist(int playlistId) async {
     try {
       await _dao.duplicatePlaylist(playlistId);

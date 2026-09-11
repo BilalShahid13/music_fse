@@ -12,10 +12,13 @@ import '../../../core/localization/generated/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/entities/playback_state.dart';
 import '../../../domain/entities/song.dart';
+import '../../../platform/xinput/gamepad_scroll_target_mixin.dart';
 import '../../providers/favorites_provider.dart';
+import '../../providers/navigation_provider.dart';
 import '../../providers/playback_provider.dart';
 import '../../providers/toast_provider.dart';
 import '../../providers/playlist_provider.dart';
+import '../../helpers/active_focus_request.dart';
 import '../../helpers/add_to_playlist_helper.dart';
 import '../../widgets/art_placeholder.dart';
 import '../dialogs/confirm_dialog.dart';
@@ -35,7 +38,8 @@ class PlaylistDetailPage extends ConsumerStatefulWidget {
   ConsumerState<PlaylistDetailPage> createState() => _PlaylistDetailPageState();
 }
 
-class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
+class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage>
+    with GamepadScrollTargetMixin {
   bool _isReorderMode = false;
   late final FocusNode _defaultFocus;
   late final FocusNode _keyListenerFocusNode;
@@ -44,10 +48,10 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
   void initState() {
     super.initState();
     _defaultFocus = FocusNode(debugLabel: 'PlaylistDetail-default');
-    _keyListenerFocusNode = FocusNode(debugLabel: 'PlaylistDetailPage-keyListener')..skipTraversal = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _defaultFocus.requestFocus();
-    });
+    _keyListenerFocusNode =
+        FocusNode(debugLabel: 'PlaylistDetailPage-keyListener')
+          ..skipTraversal = true;
+    scheduleActiveFocusRequest(state: this, focusNode: _defaultFocus);
   }
 
   @override
@@ -62,6 +66,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
     switch (event.logicalKey) {
       case LogicalKeyboardKey.escape:
       case LogicalKeyboardKey.gameButtonB:
+      case LogicalKeyboardKey.keyB:
         if (_isReorderMode) {
           setState(() => _isReorderMode = false);
           return KeyEventResult.handled;
@@ -80,14 +85,21 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showConfirmDialog(
       context,
-      title: l10n.deletePlaylistConfirm(ref.read(playlistsProvider()).value?.firstWhere((p) => p.id == widget.playlistId).name ?? ''),
+      title: l10n.deletePlaylistConfirm(ref
+              .read(playlistsProvider())
+              .value
+              ?.firstWhere((p) => p.id == widget.playlistId)
+              .name ??
+          ''),
       message: l10n.deletePlaylistBody,
       confirmLabel: l10n.delete,
       cancelLabel: l10n.cancel,
       isDangerous: true,
     );
     if (confirmed == true && mounted) {
-      await ref.read(playlistsProvider().notifier).deletePlaylist(widget.playlistId);
+      await ref
+          .read(playlistsProvider().notifier)
+          .deletePlaylist(widget.playlistId);
       if (mounted) context.pop();
     }
   }
@@ -102,6 +114,9 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
     final currentSongId = ref.watch(
       playbackProvider.select((s) => s.currentSong?.id),
     );
+    final currentRoute = ref.watch(navigationProvider);
+
+    syncGamepadScrollTarget(currentRoute.startsWith('/playlists/'));
 
     final playlist = playlistsAsync.value?.firstWhere(
       (p) => p.id == widget.playlistId,
@@ -115,6 +130,7 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
         backgroundColor: ext.bgDeep,
         body: songsAsync.when(
           data: (songs) => CustomScrollView(
+            controller: _isReorderMode ? null : gamepadScrollController,
             slivers: [
               // ── Header ────────────────────────────────────────────────
               SliverToBoxAdapter(
@@ -127,15 +143,25 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
                     artCachePath: playlist?.coverArtPath,
                     isSmart: playlist?.isSmart ?? false,
                     defaultFocus: _defaultFocus,
-                    onPlayAll: songs.isEmpty ? null : () => ref.read(playbackProvider.notifier).playQueue(songs),
+                    onPlayAll: songs.isEmpty
+                        ? null
+                        : () => ref
+                            .read(playbackProvider.notifier)
+                            .playQueue(songs),
                     onShuffle: songs.isEmpty
                         ? null
                         : () {
                             final shuffled = List.of(songs)..shuffle();
-                            ref.read(playbackProvider.notifier).playQueue(shuffled);
+                            ref
+                                .read(playbackProvider.notifier)
+                                .playQueue(shuffled);
                           },
-                    onDelete: playlist?.isSmart ?? true ? null : _deletePlaylist,
-                    onToggleReorder: playlist?.isSmart ?? true ? null : () => setState(() => _isReorderMode = !_isReorderMode),
+                    onDelete:
+                        playlist?.isSmart ?? true ? null : _deletePlaylist,
+                    onToggleReorder: playlist?.isSmart ?? true
+                        ? null
+                        : () =>
+                            setState(() => _isReorderMode = !_isReorderMode),
                     isReorderMode: _isReorderMode,
                   ),
                 ),
@@ -153,10 +179,15 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
               else if (_isReorderMode)
                 SliverFillRemaining(
                   child: ReorderableListView.builder(
+                    buildDefaultDragHandles: false,
+                    scrollController: gamepadScrollController,
                     itemCount: songs.length,
                     onReorder: (oldIndex, newIndex) {
                       if (newIndex > oldIndex) newIndex--;
-                      ref.read(playlistSongsProvider(widget.playlistId).notifier).reorderSong(oldIndex, newIndex);
+                      ref
+                          .read(
+                              playlistSongsProvider(widget.playlistId).notifier)
+                          .reorderSong(oldIndex, newIndex);
                     },
                     itemBuilder: (ctx, i) {
                       final song = songs[i];
@@ -166,9 +197,27 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
                         index: i,
                         isCurrentlyPlaying: song.id == currentSongId,
                         isFavorite: song.isFavorite,
-                        onTap: () => ref.read(playbackProvider.notifier).playSong(song, queue: songs, index: i, sourceType: QueueSourceType.playlist),
-                        onContextMenu: () => _showContextMenu(ctx, song, songs, i),
-                        trailing: Icon(LucideIcons.gripVertical, size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        onTap: () => ref
+                            .read(playbackProvider.notifier)
+                            .playSong(song,
+                                queue: songs,
+                                index: i,
+                                sourceType: QueueSourceType.playlist),
+                        onContextMenu: () =>
+                            _showContextMenu(ctx, song, songs, i),
+                        trailing: MouseRegion(
+                          cursor: SystemMouseCursors.grab,
+                          child: ReorderableDragStartListener(
+                            index: i,
+                            child: Icon(
+                              LucideIcons.gripVertical,
+                              size: 20,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                          ),
+                        ),
                       );
                     },
                   ),
@@ -184,8 +233,13 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
                       index: i,
                       isCurrentlyPlaying: song.id == currentSongId,
                       isFavorite: song.isFavorite,
-                      onTap: () => ref.read(playbackProvider.notifier).playSong(song, queue: songs, index: i, sourceType: QueueSourceType.playlist),
-                      onContextMenu: () => _showContextMenu(ctx, song, songs, i),
+                      onTap: () => ref.read(playbackProvider.notifier).playSong(
+                          song,
+                          queue: songs,
+                          index: i,
+                          sourceType: QueueSourceType.playlist),
+                      onContextMenu: () =>
+                          _showContextMenu(ctx, song, songs, i),
                     );
                   },
                 ),
@@ -217,7 +271,8 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
         ContextMenuItem(
           label: l10n.ctxPlay,
           icon: LucideIcons.play,
-          onTap: () => ref.read(playbackProvider.notifier).playSong(song, queue: songs, index: index, sourceType: QueueSourceType.playlist),
+          onTap: () => ref.read(playbackProvider.notifier).playSong(song,
+              queue: songs, index: index, sourceType: QueueSourceType.playlist),
         ),
         ContextMenuItem(
           label: l10n.ctxAddToQueue,
@@ -237,12 +292,18 @@ class _PlaylistDetailPageState extends ConsumerState<PlaylistDetailPage> {
           label: l10n.ctxRemoveFromPlaylist,
           icon: LucideIcons.listMinus,
           isDangerous: true,
-          onTap: () => ref.read(playlistSongsProvider(widget.playlistId).notifier).removeSong(song.id),
+          onTap: () => ref
+              .read(playlistSongsProvider(widget.playlistId).notifier)
+              .removeSong(song.id),
         ),
         ContextMenuItem(
-          label: song.isFavorite ? l10n.ctxRemoveFromFavorites : l10n.ctxAddToFavorites,
+          label: song.isFavorite
+              ? l10n.ctxRemoveFromFavorites
+              : l10n.ctxAddToFavorites,
           icon: song.isFavorite ? LucideIcons.heartOff : LucideIcons.heart,
-          onTap: () => ref.read(favoritesProvider().notifier).toggleFavorite(song.id, isFavorite: song.isFavorite),
+          onTap: () => ref
+              .read(favoritesProvider().notifier)
+              .toggleFavorite(song.id, isFavorite: song.isFavorite),
         ),
       ],
     );
@@ -323,13 +384,16 @@ class _PlaylistHeader extends StatelessWidget {
               if (isSmart)
                 Container(
                   margin: const EdgeInsets.only(bottom: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: cs.primary.withOpacity(0.15),
+                    color: cs.primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: cs.primary.withOpacity(0.3)),
+                    border:
+                        Border.all(color: cs.primary.withValues(alpha: 0.3)),
                   ),
-                  child: Text(l10n.smartTag, style: tt.labelSmall?.copyWith(color: cs.primary)),
+                  child: Text(l10n.smartTag,
+                      style: tt.labelSmall?.copyWith(color: cs.primary)),
                 ),
               Text(
                 playlistName,
@@ -342,7 +406,8 @@ class _PlaylistHeader extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                l10n.songCountDuration(songCount, _formatDuration(totalDurationMs)),
+                l10n.songCountDuration(
+                    songCount, _formatDuration(totalDurationMs)),
                 style: tt.bodySmall?.copyWith(color: ext.textTertiary),
               ),
               const SizedBox(height: 20),
@@ -367,7 +432,9 @@ class _PlaylistHeader extends StatelessWidget {
                   if (onToggleReorder != null) ...[
                     const SizedBox(width: 10),
                     _ActionBtn(
-                      icon: isReorderMode ? LucideIcons.check : LucideIcons.arrowUpDown,
+                      icon: isReorderMode
+                          ? LucideIcons.check
+                          : LucideIcons.arrowUpDown,
                       label: isReorderMode ? l10n.done : l10n.ctxReorder,
                       onTap: onToggleReorder!,
                     ),
@@ -445,9 +512,9 @@ class _ActionBtnState extends State<_ActionBtn> {
       fgColor = Colors.white;
       borderColor = Colors.transparent;
     } else if (widget.isDestructive) {
-      bgColor = ext.destructive.withOpacity(0.1);
+      bgColor = ext.destructive.withValues(alpha: 0.1);
       fgColor = ext.destructive;
-      borderColor = ext.destructive.withOpacity(0.3);
+      borderColor = ext.destructive.withValues(alpha: 0.3);
     }
 
     return FocusHighlight(
@@ -469,7 +536,8 @@ class _ActionBtnState extends State<_ActionBtn> {
             children: [
               Icon(widget.icon, size: 14, color: fgColor),
               const SizedBox(width: 6),
-              Text(widget.label, style: tt.labelSmall?.copyWith(color: fgColor)),
+              Text(widget.label,
+                  style: tt.labelSmall?.copyWith(color: fgColor)),
             ],
           ),
         ),

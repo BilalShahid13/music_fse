@@ -8,15 +8,19 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/localization/generated/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../platform/xinput/gamepad_scroll_target_mixin.dart';
 import '../../providers/favorites_provider.dart';
+import '../../providers/navigation_provider.dart';
 import '../../providers/playback_provider.dart';
 import '../../providers/toast_provider.dart';
+import '../../helpers/active_focus_request.dart';
 import '../../helpers/add_to_playlist_helper.dart';
 import '../../../domain/entities/playback_state.dart';
 import '../../../domain/entities/song.dart';
 import '../../widgets/context_menu.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/focus_highlight.dart';
+import '../../widgets/header_sort_dropdown.dart';
 import '../../widgets/selectable_song_tile.dart';
 
 /// Favorites page — all favorited songs.
@@ -29,7 +33,18 @@ class FavoritesPage extends ConsumerStatefulWidget {
   ConsumerState<FavoritesPage> createState() => _FavoritesPageState();
 }
 
-class _FavoritesPageState extends ConsumerState<FavoritesPage> {
+class _FavoritesPageState extends ConsumerState<FavoritesPage>
+    with GamepadScrollTargetMixin {
+  static const List<HeaderSortOption> _sortOptions = [
+    HeaderSortOption(key: 'title', label: 'Title'),
+    HeaderSortOption(key: 'artist', label: 'Artist'),
+    HeaderSortOption(
+      key: 'dateAdded',
+      label: 'Date Added',
+      defaultAscending: false,
+    ),
+  ];
+
   String _sortBy = 'title';
   bool _ascending = true;
   late final FocusNode _defaultFocus;
@@ -39,10 +54,9 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
   void initState() {
     super.initState();
     _defaultFocus = FocusNode(debugLabel: 'Favorites-default');
-    _keyListenerFocusNode = FocusNode(debugLabel: 'FavoritesPage-keyListener')..skipTraversal = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _defaultFocus.requestFocus();
-    });
+    _keyListenerFocusNode = FocusNode(debugLabel: 'FavoritesPage-keyListener')
+      ..skipTraversal = true;
+    scheduleActiveFocusRequest(state: this, focusNode: _defaultFocus);
   }
 
   @override
@@ -70,6 +84,9 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
     final currentSongId = ref.watch(
       playbackProvider.select((s) => s.currentSong?.id),
     );
+    final currentRoute = ref.watch(navigationProvider);
+
+    syncGamepadScrollTarget(currentRoute == '/favorites');
 
     return KeyboardListener(
       focusNode: _keyListenerFocusNode,
@@ -123,23 +140,30 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
                       child: Row(
                         children: [
                           _ActionChip(
+                            focusNode: _defaultFocus,
                             icon: LucideIcons.play,
-                            label: 'Play All',
-                            onTap: () => ref.read(playbackProvider.notifier).playQueue(songs),
+                            label: l10n.playAll,
+                            isPrimary: true,
+                            onTap: () => ref
+                                .read(playbackProvider.notifier)
+                                .playQueue(songs),
                           ),
                           const SizedBox(width: 10),
                           _ActionChip(
                             icon: LucideIcons.shuffle,
-                            label: 'Shuffle',
+                            label: l10n.shuffle,
                             onTap: () {
                               final shuffled = List.of(songs)..shuffle();
-                              ref.read(playbackProvider.notifier).playQueue(shuffled);
+                              ref
+                                  .read(playbackProvider.notifier)
+                                  .playQueue(shuffled);
                             },
                           ),
                           const SizedBox(width: 6),
                           Text(
                             '${songs.length} song${songs.length == 1 ? '' : 's'}',
-                            style: tt.bodySmall?.copyWith(color: ext.textTertiary),
+                            style:
+                                tt.bodySmall?.copyWith(color: ext.textTertiary),
                           ),
                         ],
                       ),
@@ -163,6 +187,7 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
                     );
                   }
                   return ListView.builder(
+                    controller: gamepadScrollController,
                     itemCount: songs.length,
                     itemBuilder: (ctx, i) {
                       final song = songs[i];
@@ -172,10 +197,16 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
                         index: i,
                         isCurrentlyPlaying: song.id == currentSongId,
                         isFavorite: true,
-                        onTap: () => ref.read(playbackProvider.notifier).playSong(song, queue: songs, index: i),
-                        onContextMenu: () => _showContextMenu(ctx, song, songs, i),
-                        onToggleFavorite: () =>
-                            ref.read(favoritesProvider(sortBy: _sortBy, ascending: _ascending).notifier).toggleFavorite(song.id, isFavorite: true),
+                        onTap: () => ref
+                            .read(playbackProvider.notifier)
+                            .playSong(song, queue: songs, index: i),
+                        onContextMenu: () =>
+                            _showContextMenu(ctx, song, songs, i),
+                        onToggleFavorite: () => ref
+                            .read(favoritesProvider(
+                                    sortBy: _sortBy, ascending: _ascending)
+                                .notifier)
+                            .toggleFavorite(song.id, isFavorite: true),
                       );
                     },
                   );
@@ -209,7 +240,10 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
         ContextMenuItem(
           label: l10n.ctxPlay,
           icon: LucideIcons.play,
-          onTap: () => ref.read(playbackProvider.notifier).playSong(song, queue: songs, index: index, sourceType: QueueSourceType.favorites),
+          onTap: () => ref.read(playbackProvider.notifier).playSong(song,
+              queue: songs,
+              index: index,
+              sourceType: QueueSourceType.favorites),
         ),
         ContextMenuItem(
           label: l10n.ctxAddToQueue,
@@ -228,7 +262,10 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
         ContextMenuItem(
           label: l10n.ctxRemoveFromFavorites,
           icon: LucideIcons.heartOff,
-          onTap: () => ref.read(favoritesProvider(sortBy: _sortBy, ascending: _ascending).notifier).toggleFavorite(song.id, isFavorite: true),
+          onTap: () => ref
+              .read(favoritesProvider(sortBy: _sortBy, ascending: _ascending)
+                  .notifier)
+              .toggleFavorite(song.id, isFavorite: true),
         ),
       ],
     );
@@ -251,37 +288,12 @@ class _SortDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ext = context.appTheme;
-    final tt = Theme.of(context).textTheme;
-
-    return PopupMenuButton<(String, bool)>(
-      onSelected: (v) => onChange(v.$1, v.$2),
-      color: ext.bgSurface,
-      child: Row(
-        children: [
-          Text('Sort', style: tt.labelMedium?.copyWith(color: ext.textSecondary)),
-          const SizedBox(width: 4),
-          Icon(LucideIcons.chevronsUpDown, size: 14, color: ext.textTertiary),
-        ],
-      ),
-      itemBuilder: (_) => [
-        PopupMenuItem(
-          value: ('title', true),
-          child: Text('Title A–Z', style: tt.bodySmall?.copyWith(color: ext.textPrimary)),
-        ),
-        PopupMenuItem(
-          value: ('title', false),
-          child: Text('Title Z–A', style: tt.bodySmall?.copyWith(color: ext.textPrimary)),
-        ),
-        PopupMenuItem(
-          value: ('artist', true),
-          child: Text('Artist A–Z', style: tt.bodySmall?.copyWith(color: ext.textPrimary)),
-        ),
-        PopupMenuItem(
-          value: ('dateAdded', false),
-          child: Text('Date Added', style: tt.bodySmall?.copyWith(color: ext.textPrimary)),
-        ),
-      ],
+    return HeaderSortDropdown(
+      value: sortBy,
+      ascending: ascending,
+      focusDebugLabel: 'FavoritesPage-sortDropdown',
+      options: _FavoritesPageState._sortOptions,
+      onChanged: onChange,
     );
   }
 }
@@ -295,21 +307,33 @@ class _ActionChip extends StatefulWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.focusNode,
+    this.isPrimary = false,
   });
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final FocusNode? focusNode;
+  final bool isPrimary;
 
   @override
   State<_ActionChip> createState() => _ActionChipState();
 }
 
 class _ActionChipState extends State<_ActionChip> {
-  final _focus = FocusNode();
+  late final FocusNode _focus;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus = widget.focusNode ?? FocusNode();
+  }
 
   @override
   void dispose() {
-    _focus.dispose();
+    if (widget.focusNode == null) {
+      _focus.dispose();
+    }
     super.dispose();
   }
 
@@ -317,6 +341,13 @@ class _ActionChipState extends State<_ActionChip> {
   Widget build(BuildContext context) {
     final ext = context.appTheme;
     final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
+    final fgColor = widget.isPrimary ? cs.onPrimary : ext.textPrimary;
+    final iconColor = widget.isPrimary ? cs.onPrimary : ext.textSecondary;
+    final bgColor = widget.isPrimary ? cs.primary : ext.bgSurface;
+    final borderColor =
+        widget.isPrimary ? Colors.transparent : ext.borderSubtle;
 
     return FocusHighlight(
       focusNode: _focus,
@@ -325,18 +356,20 @@ class _ActionChipState extends State<_ActionChip> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          height: AppConstants.minFocusableSize,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
-            color: ext.bgSurface,
+            color: bgColor,
             borderRadius: BorderRadius.circular(AppConstants.btnRadius),
-            border: Border.all(color: ext.borderSubtle),
+            border: Border.all(color: borderColor),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(widget.icon, size: 14, color: ext.textSecondary),
+              Icon(widget.icon, size: 14, color: iconColor),
               const SizedBox(width: 6),
-              Text(widget.label, style: tt.labelSmall?.copyWith(color: ext.textPrimary)),
+              Text(widget.label,
+                  style: tt.labelSmall?.copyWith(color: fgColor)),
             ],
           ),
         ),

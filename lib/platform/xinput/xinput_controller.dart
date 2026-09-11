@@ -141,11 +141,15 @@ final class XInputController {
     final state = _binding.getState(0);
     if (state == null) return; // Controller disconnected.
 
-    // Skip if nothing changed.
-    if (state.packetNumber == _previousPacket) return;
+    final packetChanged = state.packetNumber != _previousPacket;
     _previousPacket = state.packetNumber;
 
-    _emitButtonEvents(state.buttons);
+    // Digital buttons only need edge-triggered updates when the device state
+    // packet changes. Analog controls must continue emitting while held so
+    // scrolling, seeking, and volume changes don't stall mid-deflection.
+    if (packetChanged) {
+      _emitButtonEvents(state.buttons);
+    }
     _emitTriggerEvents(state.leftTrigger, state.rightTrigger);
     _emitStickEvents(state.thumbLX, state.thumbLY, state.thumbRX, state.thumbRY);
   }

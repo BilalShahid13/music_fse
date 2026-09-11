@@ -12,10 +12,9 @@ import '../providers/settings_provider.dart';
 ///
 /// Spec (REQUIREMENTS §6.14 / CLAUDE.md §6.1):
 /// - Height: 36px (AppConstants.titleBarHeight)
-/// - Transparent / bgDeep background
+/// - bgDeep background matching the active app theme
 /// - Left: 20×20 app icon + "Music FSE" label (label only at ≥1200px)
 /// - Right: Minimize (46×36) → Maximize/Restore (46×36) → Close (46×36)
-///   - Close button turns red (#E81123) on hover
 /// - Entire bar acts as a drag region except the three window control buttons
 ///
 /// Not focusable via gamepad (title bar buttons are mouse-only per spec).
@@ -84,35 +83,44 @@ class _CustomTitleBarState extends ConsumerState<CustomTitleBar> with WindowList
   @override
   Widget build(BuildContext context) {
     final sizes = AppSizes.of(context);
+    final ext = context.appTheme;
 
-    return SizedBox(
-      height: sizes.titleBarHeight,
-      child: Row(
-        children: [
-          // ── Drag region + left identity ─────────────────────────────────
-          const Expanded(
-            child: DragToMoveArea(child: SizedBox.expand()),
-          ),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: ext.bgDeep,
+        border: Border(
+          bottom: BorderSide(color: ext.borderSubtle),
+        ),
+      ),
+      child: SizedBox(
+        height: sizes.titleBarHeight,
+        child: Row(
+          children: [
+            // ── Drag region + left identity ─────────────────────────────────
+            const Expanded(
+              child: DragToMoveArea(child: SizedBox.expand()),
+            ),
 
-          // ── Window controls ─────────────────────────────────────────────
-          _WindowButton(
-            icon: LucideIcons.minus,
-            onPressed: windowManager.minimize,
-            isCompact: sizes.isCompact,
-          ),
-          _WindowButton(
-            icon: _isMaximized ? LucideIcons.minimize2 : LucideIcons.maximize2,
-            isCompact: sizes.isCompact,
-            onPressed: () async {
-              if (_isMaximized) {
-                await windowManager.unmaximize();
-              } else {
-                await windowManager.maximize();
-              }
-            },
-          ),
-          _CloseButton(onTap: _handleClose, isCompact: sizes.isCompact),
-        ],
+            // ── Window controls ─────────────────────────────────────────────
+            _WindowButton(
+              icon: LucideIcons.minus,
+              onPressed: windowManager.minimize,
+              isCompact: sizes.isCompact,
+            ),
+            _WindowButton(
+              icon: _isMaximized ? LucideIcons.minimize2 : LucideIcons.maximize2,
+              isCompact: sizes.isCompact,
+              onPressed: () async {
+                if (_isMaximized) {
+                  await windowManager.unmaximize();
+                } else {
+                  await windowManager.maximize();
+                }
+              },
+            ),
+            _CloseButton(onTap: _handleClose, isCompact: sizes.isCompact),
+          ],
+        ),
       ),
     );
   }
@@ -122,7 +130,7 @@ class _CustomTitleBarState extends ConsumerState<CustomTitleBar> with WindowList
 // Window control button (non-close)
 // =============================================================================
 
-class _WindowButton extends StatefulWidget {
+class _WindowButton extends StatelessWidget {
   const _WindowButton({
     required this.icon,
     required this.onPressed,
@@ -134,33 +142,21 @@ class _WindowButton extends StatefulWidget {
   final bool isCompact;
 
   @override
-  State<_WindowButton> createState() => _WindowButtonState();
-}
-
-class _WindowButtonState extends State<_WindowButton> {
-  bool _isHovered = false;
-
-  @override
   Widget build(BuildContext context) {
     final ext = context.appTheme;
-    final bgColor = _isHovered ? ext.bgCardHover : Colors.transparent;
     final sizes = AppSizes.of(context);
-    final btnWidth = widget.isCompact ? 42.0 : 46.0;
-    final iconSize = widget.isCompact ? 12.0 : 14.0;
+    final btnWidth = isCompact ? 42.0 : 46.0;
+    final iconSize = isCompact ? 12.0 : 14.0;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: GestureDetector(
-        onTap: widget.onPressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 80),
-          width: btnWidth,
-          height: sizes.titleBarHeight,
-          color: bgColor,
-          child: Center(
-            child: Icon(widget.icon, size: iconSize, color: ext.textSecondary),
-          ),
+    return GestureDetector(
+      onTap: onPressed,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 80),
+        width: btnWidth,
+        height: sizes.titleBarHeight,
+        color: Colors.transparent,
+        child: Center(
+          child: Icon(icon, size: iconSize, color: ext.textSecondary),
         ),
       ),
     );
@@ -168,46 +164,31 @@ class _WindowButtonState extends State<_WindowButton> {
 }
 
 // =============================================================================
-// Close button (turns red on hover)
+// Close button
 // =============================================================================
 
-class _CloseButton extends StatefulWidget {
+class _CloseButton extends StatelessWidget {
   const _CloseButton({required this.onTap, this.isCompact = false});
 
   final VoidCallback onTap;
   final bool isCompact;
 
   @override
-  State<_CloseButton> createState() => _CloseButtonState();
-}
-
-class _CloseButtonState extends State<_CloseButton> {
-  bool _isHovered = false;
-
-  static const _hoverBg = Color(0xFFE81123);
-
-  @override
   Widget build(BuildContext context) {
     final ext = context.appTheme;
-    final iconColor = _isHovered ? Colors.white : ext.textSecondary;
-    final bgColor = _isHovered ? _hoverBg : Colors.transparent;
     final sizes = AppSizes.of(context);
-    final btnWidth = widget.isCompact ? 42.0 : 46.0;
-    final iconSize = widget.isCompact ? 12.0 : 14.0;
+    final btnWidth = isCompact ? 42.0 : 46.0;
+    final iconSize = isCompact ? 12.0 : 14.0;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 80),
-          width: btnWidth,
-          height: sizes.titleBarHeight,
-          color: bgColor,
-          child: Center(
-            child: Icon(LucideIcons.x, size: iconSize, color: iconColor),
-          ),
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 80),
+        width: btnWidth,
+        height: sizes.titleBarHeight,
+        color: Colors.transparent,
+        child: Center(
+          child: Icon(LucideIcons.x, size: iconSize, color: ext.textSecondary),
         ),
       ),
     );

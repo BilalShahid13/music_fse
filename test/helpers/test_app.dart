@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:music_fse/core/constants/app_enums.dart';
 import 'package:music_fse/core/theme/app_theme.dart';
 import 'package:riverpod/misc.dart' show Override;
 
@@ -15,6 +16,8 @@ Widget testApp({
     child: MaterialApp(
       theme: AppTheme.buildTheme(
         accentColor: Colors.blue,
+        accentTextColor: AccentTextColorSetting.auto,
+        appFont: AppFontSetting.inter,
         brightness: Brightness.dark,
       ),
       home: Scaffold(body: child),

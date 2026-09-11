@@ -70,4 +70,4 @@ final class NavSoundPlayerProvider
   }
 }
 
-String _$navSoundPlayerHash() => r'1d854520e2f4f096c41e1227dc3d3904df6baff5';
+String _$navSoundPlayerHash() => r'0b71d7238c96812b04a1db9c043838f00c0d1320';

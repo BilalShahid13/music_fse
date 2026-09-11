@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../widgets/gamepad_button_hints.dart';
 
 /// Dialog with a single text field + confirm/cancel.
 ///
@@ -93,6 +94,9 @@ class _TextInputDialogState extends State<_TextInputDialog> {
     _cancelFocus = FocusNode(debugLabel: 'TextInputDialog-cancel');
     _confirmFocus = FocusNode(debugLabel: 'TextInputDialog-confirm');
     _keyListenerFocusNode = FocusNode(debugLabel: 'TextInputDialogState-keyListener')..skipTraversal = true;
+    _fieldFocus.addListener(_handleFocusChanged);
+    _cancelFocus.addListener(_handleFocusChanged);
+    _confirmFocus.addListener(_handleFocusChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fieldFocus.requestFocus();
       // Select all text so the user can immediately overwrite the initial value.
@@ -105,6 +109,9 @@ class _TextInputDialogState extends State<_TextInputDialog> {
 
   @override
   void dispose() {
+    _fieldFocus.removeListener(_handleFocusChanged);
+    _cancelFocus.removeListener(_handleFocusChanged);
+    _confirmFocus.removeListener(_handleFocusChanged);
     _controller.dispose();
     _fieldFocus.dispose();
     _cancelFocus.dispose();
@@ -119,9 +126,33 @@ class _TextInputDialogState extends State<_TextInputDialog> {
     Navigator.of(context).pop(trimmed);
   }
 
+  void _handleFocusChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  void _handlePrimaryAction() {
+    if (_cancelFocus.hasFocus) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    _confirm();
+  }
+
+  String _primaryHintLabel() {
+    if (_cancelFocus.hasFocus) return widget.cancelLabel;
+    return widget.confirmLabel;
+  }
+
   KeyEventResult _handleKey(KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.gameButtonA) {
+      _handlePrimaryAction();
+      return KeyEventResult.handled;
     }
 
     if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
@@ -236,36 +267,25 @@ class _TextInputDialogState extends State<_TextInputDialog> {
                     children: [
                       OutlinedButton(
                         focusNode: _cancelFocus,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(88, AppConstants.minFocusableSize),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppConstants.btnRadius),
-                          ),
-                        ),
                         onPressed: () => Navigator.of(context).pop(),
-                        child: Text(
-                          widget.cancelLabel,
-                          style: tt.labelLarge?.copyWith(color: ext.textSecondary),
-                        ),
+                        child: Text(widget.cancelLabel),
                       ),
                       const SizedBox(width: 12),
                       FilledButton(
                         focusNode: _confirmFocus,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: accent,
-                          minimumSize: const Size(88, AppConstants.minFocusableSize),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppConstants.btnRadius),
-                          ),
-                        ),
                         onPressed: _confirm,
-                        child: Text(
-                          widget.confirmLabel,
-                          style: tt.labelLarge?.copyWith(color: Colors.white),
-                        ),
+                        child: Text(widget.confirmLabel),
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(height: 16),
+                GamepadButtonHints(
+                  aLabel: _primaryHintLabel(),
+                  bLabel: widget.cancelLabel,
+                  onAPressed: _handlePrimaryAction,
+                  onBPressed: () => Navigator.of(context).pop(),
+                  backgroundColor: ext.bgSurface,
                 ),
               ],
             ),

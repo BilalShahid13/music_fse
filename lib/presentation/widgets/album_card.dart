@@ -54,7 +54,8 @@ class AlbumCard extends StatefulWidget {
 class _AlbumCardState extends State<AlbumCard> {
   FocusNode? _internalFocusNode;
 
-  FocusNode get _focusNode => widget.focusNode ?? (_internalFocusNode ??= FocusNode());
+  FocusNode get _focusNode =>
+      widget.focusNode ?? (_internalFocusNode ??= FocusNode());
 
   @override
   void initState() {
@@ -72,7 +73,8 @@ class _AlbumCardState extends State<AlbumCard> {
     final ext = context.appTheme;
     final tt = Theme.of(context).textTheme;
     final sizes = AppSizes.of(context);
-    final titleStyle = tt.bodyMedium?.copyWith(color: ext.textPrimary) ?? DefaultTextStyle.of(context).style;
+    final titleStyle = tt.bodyMedium?.copyWith(color: ext.textPrimary) ??
+        DefaultTextStyle.of(context).style;
 
     final artSize = widget.width - sizes.cardPadding * 2;
 
@@ -107,7 +109,9 @@ class _AlbumCardState extends State<AlbumCard> {
                       return _buildArt(
                         artSize,
                         sizes.cardRadiusSm,
-                        showFocusedPlayCue: widget.showFocusedPlayCue && _focusNode.hasFocus && !widget.isCurrentlyPlaying,
+                        showFocusedPlayCue: widget.showFocusedPlayCue &&
+                            _focusNode.hasFocus &&
+                            !widget.isCurrentlyPlaying,
                       );
                     },
                   ),
@@ -140,9 +144,9 @@ class _AlbumCardState extends State<AlbumCard> {
     double borderRadiusValue, {
     required bool showFocusedPlayCue,
   }) {
-    final sizes = AppSizes.of(context);
     final cueIconSize = size * 0.32;
-    final placeholderIconOffset = widget.artPlaceholderIconOffset ?? (sizes.isCompact ? Offset.zero : Offset(size * 0.024, size * 0.012));
+    final placeholderIconOffset =
+        widget.artPlaceholderIconOffset ?? Offset.zero;
 
     Widget art;
     if (widget.artCachePath != null) {

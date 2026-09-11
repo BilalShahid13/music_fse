@@ -14,7 +14,9 @@ import '../../../widgets/focus_highlight.dart';
 
 /// Genres tab — virtualized list of genre rows with a colored icon.
 class GenresTab extends ConsumerWidget {
-  const GenresTab({super.key});
+  const GenresTab({super.key, this.scrollController});
+
+  final ScrollController? scrollController;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -38,6 +40,7 @@ class GenresTab extends ConsumerWidget {
           );
         }
         return ListView.builder(
+          controller: scrollController,
           padding: EdgeInsets.zero,
           itemCount: genres.length,
           itemBuilder: (ctx, i) => _GenreTile(
@@ -133,7 +136,7 @@ class _GenreTileState extends State<_GenreTile> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
+                    color: color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(LucideIcons.tag, size: 18, color: color),

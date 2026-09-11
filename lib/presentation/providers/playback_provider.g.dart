@@ -74,7 +74,7 @@ final class PlaybackNotifierProvider
   }
 }
 
-String _$playbackNotifierHash() => r'5313976872f8d9cd40549301de0498b1c360cd57';
+String _$playbackNotifierHash() => r'7ef2ff617798e00df1e0ce08498b37090dda9471';
 
 /// The central audio-engine state machine.
 ///

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../core/utils/logger.dart';
+import 'gamepad_scroll_target.dart';
 import 'xinput_controller.dart';
 
 // ---------------------------------------------------------------------------
@@ -37,20 +38,26 @@ import 'xinput_controller.dart';
 ///
 /// Y → triggers [onToggleFavorite].
 ///
-/// LB / RB → triggers [onPreviousTab] / [onNextTab].
+/// LB / RB → synthesize shoulder key events first so focused widgets can
+/// override them (for example, Library tab switching). If unhandled, they fall
+/// back to [onPreviousTab] / [onNextTab].
 ///
 /// Start → toggles play/pause.
 ///
-/// LT / RT (triggers) → adjust volume via [onVolumeChange] (delta ±5 %).
+/// LT / RT (triggers) → synthesised LT/RT key events so focused widgets can
+/// override them before shell-level defaults run.
 ///
 /// Left Stick → scrollable list navigation (forwarded as arrow key events).
 ///
-/// Right Stick X → seek relative via [onSeekRelative] (±10 s per full deflection).
+/// Right Stick X → seek relative via [onSeekRelative] (±5 s per full deflection).
 final class GamepadInputHandler {
   GamepadInputHandler();
 
   static const _dpadInitialRepeatDelay = Duration(milliseconds: 280);
   static const _dpadRepeatInterval = Duration(milliseconds: 90);
+  static const _rightStickVerticalThreshold = 0.2;
+  static const _rightStickHorizontalThreshold = 0.3;
+  static const _rightStickAxisDominanceMargin = 0.12;
 
   // -------------------------------------------------------------------------
   // Configurable callbacks (presentation layer wires these up)
@@ -74,10 +81,6 @@ final class GamepadInputHandler {
   /// Called when RB is pressed (next tab / next track).
   VoidCallback? onNextTab;
 
-  /// Called repeatedly while LT/RT are held.
-  /// [delta] is −1.0 (full LT = volume down) to +1.0 (full RT = volume up).
-  void Function(double delta)? onVolumeChange;
-
   /// Called when the right stick X axis is deflected.
   /// [seconds] is how many seconds to seek (positive = forward, negative = back).
   void Function(double seconds)? onSeekRelative;
@@ -88,6 +91,9 @@ final class GamepadInputHandler {
 
   StreamSubscription<GamepadEvent>? _sub;
   final Map<DpadDirection, Timer> _dpadRepeatTimers = <DpadDirection, Timer>{};
+  ScrollableState? _lastScrollable;
+  bool _leftTriggerPressed = false;
+  bool _rightTriggerPressed = false;
 
   // Debounce left-stick D-pad repeats so they don't fire at 60 Hz.
   DateTime _lastLeftStickX = DateTime(0);
@@ -127,7 +133,12 @@ final class GamepadInputHandler {
         _handleDpadEvent(direction, pressed);
       case GamepadTriggerEvent(:final leftTrigger, :final rightTrigger):
         _handleTriggers(leftTrigger, rightTrigger);
-      case GamepadStickEvent(:final leftX, :final leftY, :final rightX, :final rightY):
+      case GamepadStickEvent(
+          :final leftX,
+          :final leftY,
+          :final rightX,
+          :final rightY
+        ):
         _handleSticks(leftX, leftY, rightX, rightY);
     }
   }
@@ -143,12 +154,32 @@ final class GamepadInputHandler {
         _injectKey(LogicalKeyboardKey.escape, PhysicalKeyboardKey.escape);
       case GamepadButton.x:
         onContextMenu?.call();
+        _injectKey(
+          LogicalKeyboardKey.gameButtonX,
+          PhysicalKeyboardKey.gameButtonX,
+        );
       case GamepadButton.y:
         onToggleFavorite?.call();
+        _injectKey(
+          LogicalKeyboardKey.gameButtonY,
+          PhysicalKeyboardKey.gameButtonY,
+        );
       case GamepadButton.leftShoulder:
-        onPreviousTab?.call();
+        final handled = _injectKey(
+          LogicalKeyboardKey.gameButtonLeft1,
+          PhysicalKeyboardKey.gameButtonLeft1,
+        );
+        if (!handled) {
+          onPreviousTab?.call();
+        }
       case GamepadButton.rightShoulder:
-        onNextTab?.call();
+        final handled = _injectKey(
+          LogicalKeyboardKey.gameButtonRight1,
+          PhysicalKeyboardKey.gameButtonRight1,
+        );
+        if (!handled) {
+          onNextTab?.call();
+        }
       case GamepadButton.start:
         onTogglePlayPause?.call();
       case GamepadButton.back:
@@ -223,34 +254,89 @@ final class GamepadInputHandler {
   }
 
   void _handleTriggers(double left, double right) {
-    final delta = right - left; // positive = volume up, negative = volume down
-    if (delta.abs() < 0.05) return; // Ignore noise near zero crossing.
-    // Scale so full trigger deflection = ±5 % per poll tick (mapped in caller).
-    onVolumeChange?.call(delta * 0.05);
+    _updateTriggerKeyState(
+      isPressed: left >= 0.12,
+      currentPressed: _leftTriggerPressed,
+      logicalKey: LogicalKeyboardKey.gameButtonLeft2,
+      physicalKey: PhysicalKeyboardKey.gameButtonLeft2,
+      onStateChanged: (value) => _leftTriggerPressed = value,
+    );
+    _updateTriggerKeyState(
+      isPressed: right >= 0.12,
+      currentPressed: _rightTriggerPressed,
+      logicalKey: LogicalKeyboardKey.gameButtonRight2,
+      physicalKey: PhysicalKeyboardKey.gameButtonRight2,
+      onStateChanged: (value) => _rightTriggerPressed = value,
+    );
+  }
+
+  void _updateTriggerKeyState({
+    required bool isPressed,
+    required bool currentPressed,
+    required LogicalKeyboardKey logicalKey,
+    required PhysicalKeyboardKey physicalKey,
+    required ValueChanged<bool> onStateChanged,
+  }) {
+    if (isPressed == currentPressed) {
+      return;
+    }
+
+    onStateChanged(isPressed);
+
+    final timeStamp = ServicesBinding.instance.currentSystemFrameTimeStamp;
+    if (isPressed) {
+      _dispatchToFocusTree(
+        KeyDownEvent(
+          physicalKey: physicalKey,
+          logicalKey: logicalKey,
+          timeStamp: timeStamp,
+          synthesized: true,
+        ),
+      );
+      return;
+    }
+
+    _dispatchToFocusTree(
+      KeyUpEvent(
+        physicalKey: physicalKey,
+        logicalKey: logicalKey,
+        timeStamp: timeStamp,
+        synthesized: true,
+      ),
+    );
   }
 
   void _handleSticks(double leftX, double leftY, double rightX, double rightY) {
     final now = DateTime.now();
 
     // ── Left stick → D-pad navigation (all 4 directions, debounced) ─────
-    if (leftY.abs() > 0.3 && now.difference(_lastLeftStickY) >= _stickNavDebounce) {
+    if (leftY.abs() > 0.3 &&
+        now.difference(_lastLeftStickY) >= _stickNavDebounce) {
       _handleDpad(leftY > 0 ? DpadDirection.up : DpadDirection.down);
       _lastLeftStickY = now;
     }
 
-    if (leftX.abs() > 0.3 && now.difference(_lastLeftStickX) >= _stickNavDebounce) {
+    if (leftX.abs() > 0.3 &&
+        now.difference(_lastLeftStickX) >= _stickNavDebounce) {
       _handleDpad(leftX > 0 ? DpadDirection.right : DpadDirection.left);
       _lastLeftStickX = now;
     }
 
+    final rightXAbs = rightX.abs();
+    final rightYAbs = rightY.abs();
+    final prefersVertical = rightYAbs > _rightStickVerticalThreshold &&
+        rightYAbs >= rightXAbs + _rightStickAxisDominanceMargin;
+    final prefersHorizontal = rightXAbs > _rightStickHorizontalThreshold &&
+        rightXAbs >= rightYAbs + _rightStickAxisDominanceMargin;
+
     // ── Right stick Y → vertical scroll ─────────────────────────────────
-    if (rightY.abs() > 0.2) {
+    if (prefersVertical) {
       _scrollVertically(-rightY);
     }
 
     // ── Right stick X → seek relative ───────────────────────────────────
-    if (rightX.abs() > 0.3) {
-      onSeekRelative?.call(rightX * 10.0);
+    if (prefersHorizontal) {
+      onSeekRelative?.call(rightX * 5.0);
     }
   }
 
@@ -260,27 +346,57 @@ final class GamepadInputHandler {
   /// [normalizedDelta] ranges from roughly −1.0 to +1.0. Positive = scroll
   /// down (content moves up), negative = scroll up.
   void _scrollVertically(double normalizedDelta) {
-    // Target the focused widget's position so the hit-test finds the correct
-    // scrollable ancestor.
-    Offset position = const Offset(400, 300);
-    final focusNode = FocusManager.instance.primaryFocus;
-    if (focusNode?.context != null) {
-      try {
-        final box = focusNode!.context!.findRenderObject() as RenderBox?;
-        if (box != null && box.hasSize) {
-          position = box.localToGlobal(box.size.center(Offset.zero));
-        }
-      } catch (_) {
-        // Node not yet laid out — use fallback position.
+    final explicitController = GamepadScrollTarget.controller;
+    if (explicitController != null) {
+      final position = explicitController.position;
+      final targetPixels = (position.pixels + (normalizedDelta * 24.0)).clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      );
+      if ((targetPixels - position.pixels).abs() >= 0.1) {
+        explicitController.jumpTo(targetPixels);
       }
+      return;
     }
 
+    final scrollable = _resolveScrollable();
+    if (scrollable == null) {
+      return;
+    }
+
+    final renderObject = scrollable.context.findRenderObject();
+    final box =
+        renderObject is RenderBox && renderObject.hasSize ? renderObject : null;
+    if (box == null) {
+      return;
+    }
+
+    final position = box.localToGlobal(box.size.center(Offset.zero));
     WidgetsBinding.instance.handlePointerEvent(
       PointerScrollEvent(
         position: position,
-        scrollDelta: Offset(0, normalizedDelta * 15.0),
+        scrollDelta: Offset(0, normalizedDelta * 24.0),
       ),
     );
+  }
+
+  ScrollableState? _resolveScrollable() {
+    final focusContext = FocusManager.instance.primaryFocus?.context;
+    if (focusContext != null) {
+      final scrollable = Scrollable.maybeOf(focusContext) ??
+          focusContext.findAncestorStateOfType<ScrollableState>();
+      if (scrollable != null && scrollable.mounted) {
+        _lastScrollable = scrollable;
+        return scrollable;
+      }
+    }
+
+    if (_lastScrollable != null && _lastScrollable!.mounted) {
+      return _lastScrollable;
+    }
+
+    _lastScrollable = null;
+    return null;
   }
 
   // -------------------------------------------------------------------------
@@ -293,25 +409,22 @@ final class GamepadInputHandler {
   ///
   /// A paired [KeyUpEvent] is injected on the next microtask to complete the
   /// key lifecycle.
-  void _injectKey(
+  bool _injectKey(
     LogicalKeyboardKey logicalKey,
     PhysicalKeyboardKey physicalKey,
   ) {
     final timestamp = ServicesBinding.instance.currentSystemFrameTimeStamp;
-
-    HardwareKeyboard.instance.handleKeyEvent(
-      KeyDownEvent(
-        physicalKey: physicalKey,
-        logicalKey: logicalKey,
-        timeStamp: timestamp,
-        synthesized: true,
-      ),
+    final keyDown = KeyDownEvent(
+      physicalKey: physicalKey,
+      logicalKey: logicalKey,
+      timeStamp: timestamp,
+      synthesized: true,
     );
+    final handled = _dispatchToFocusTree(keyDown);
 
     // Schedule the key-up one microtask later so widgets see a full press cycle.
     Future.microtask(() {
-      if (!HardwareKeyboard.instance.isLogicalKeyPressed(logicalKey)) return;
-      HardwareKeyboard.instance.handleKeyEvent(
+      _dispatchToFocusTree(
         KeyUpEvent(
           physicalKey: physicalKey,
           logicalKey: logicalKey,
@@ -320,5 +433,23 @@ final class GamepadInputHandler {
         ),
       );
     });
+
+    return handled;
+  }
+
+  bool _dispatchToFocusTree(KeyEvent event) {
+    final primary = FocusManager.instance.primaryFocus;
+    if (primary == null) return false;
+
+    FocusNode? current = primary;
+    while (current != null) {
+      final result = current.onKeyEvent?.call(current, event);
+      if (result == KeyEventResult.handled) {
+        return true;
+      }
+      current = current.parent;
+    }
+
+    return false;
   }
 }

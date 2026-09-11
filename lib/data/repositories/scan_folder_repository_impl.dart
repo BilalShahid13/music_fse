@@ -46,6 +46,17 @@ final class ScanFolderRepositoryImpl implements ScanFolderRepository {
   }
 
   @override
+  Future<Result<void>> clearAllFolders() async {
+    try {
+      await _dao.clearAllFolders();
+      return const Result.success(null);
+    } catch (e, st) {
+      AppLogger.error('clearAllFolders failed', tag: 'ScanFolderRepo', error: e, stackTrace: st);
+      return Result.failure(AppError.database(message: e.toString()));
+    }
+  }
+
+  @override
   Future<Result<void>> toggleEnabled(
     int id, {
     required bool enabled,

@@ -5,10 +5,14 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_sizes.dart';
+import '../../../core/localization/generated/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/entities/playlist.dart';
+import '../../../platform/xinput/gamepad_scroll_target.dart';
 import '../../providers/playlist_provider.dart';
 import '../../widgets/focus_highlight.dart';
+import '../../widgets/focus_hint_registry.dart';
+import '../../widgets/gamepad_button_hints.dart';
 
 /// Dialog presenting a scrollable list of playlists + "Create New" option.
 ///
@@ -54,12 +58,15 @@ class _AddToPlaylistDialog extends ConsumerStatefulWidget {
 class _AddToPlaylistDialogState extends ConsumerState<_AddToPlaylistDialog> {
   late final FocusNode _createNewFocus;
   late final FocusNode _keyListenerFocusNode;
+  late final ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
     _createNewFocus = FocusNode(debugLabel: 'AddToPlaylist-createNew');
     _keyListenerFocusNode = FocusNode(debugLabel: 'AddToPlaylistDialogState-keyListener')..skipTraversal = true;
+    _scrollController = ScrollController();
+    GamepadScrollTarget.set(_scrollController);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _createNewFocus.requestFocus();
     });
@@ -69,13 +76,16 @@ class _AddToPlaylistDialogState extends ConsumerState<_AddToPlaylistDialog> {
   void dispose() {
     _createNewFocus.dispose();
     _keyListenerFocusNode.dispose();
+    GamepadScrollTarget.clear(_scrollController);
+    _scrollController.dispose();
     super.dispose();
   }
 
   KeyEventResult _handleKey(KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     if (event.logicalKey == LogicalKeyboardKey.escape ||
-        event.logicalKey == LogicalKeyboardKey.gameButtonB) {
+        event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+        event.logicalKey == LogicalKeyboardKey.keyB) {
       Navigator.of(context).pop();
       return KeyEventResult.handled;
     }
@@ -87,6 +97,7 @@ class _AddToPlaylistDialogState extends ConsumerState<_AddToPlaylistDialog> {
     final ext = context.appTheme;
     final tt = Theme.of(context).textTheme;
     final sizes = AppSizes.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     final playlistsAsync = ref.watch(
       playlistsProvider(sortBy: 'updatedAt', ascending: false),
@@ -128,7 +139,7 @@ class _AddToPlaylistDialogState extends ConsumerState<_AddToPlaylistDialog> {
                     0,
                   ),
                   child: Text(
-                    'Add to Playlist',
+                    l10n.ctxAddToPlaylist,
                     style: tt.titleLarge?.copyWith(color: ext.textPrimary),
                   ),
                 ),
@@ -139,7 +150,7 @@ class _AddToPlaylistDialogState extends ConsumerState<_AddToPlaylistDialog> {
                 _PlaylistListItem(
                   focusNode: _createNewFocus,
                   leadingIcon: LucideIcons.plus,
-                  title: 'Create New Playlist',
+                  title: l10n.ctxNewPlaylist,
                   subtitle: null,
                   isCreateNew: true,
                   onTap: () => Navigator.of(context).pop(
@@ -172,6 +183,7 @@ class _AddToPlaylistDialogState extends ConsumerState<_AddToPlaylistDialog> {
                         );
                       }
                       return ListView.builder(
+                        controller: _scrollController,
                         shrinkWrap: true,
                         itemCount: userPlaylists.length,
                         itemBuilder: (context, index) {
@@ -194,6 +206,18 @@ class _AddToPlaylistDialogState extends ConsumerState<_AddToPlaylistDialog> {
                       child: Center(child: Icon(LucideIcons.circleAlert)),
                     ),
                   ),
+                ),
+                ValueListenableBuilder<FocusHintCapabilities?>(
+                  valueListenable: focusedHintCapabilities,
+                  builder: (context, focusedCaps, _) {
+                    return GamepadButtonHints(
+                      aLabel: focusedCaps?.supportsA == true ? l10n.hintSelect : null,
+                      bLabel: l10n.hintClose,
+                      onAPressed: focusedCaps?.supportsA == true ? focusedCaps?.onA : null,
+                      onBPressed: () => Navigator.of(context).pop(),
+                      backgroundColor: ext.bgSurface,
+                    );
+                  },
                 ),
               ],
             ),

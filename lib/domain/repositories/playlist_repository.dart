@@ -27,6 +27,9 @@ abstract class PlaylistRepository {
   /// Deletes the playlist and all of its PlaylistSongs entries.
   Future<Result<void>> deletePlaylist(int playlistId);
 
+  /// Deletes all playlists and their song membership rows.
+  Future<Result<void>> clearAllPlaylists();
+
   /// Duplicates [playlistId] with a " (Copy)" name suffix.
   Future<Result<void>> duplicatePlaylist(int playlistId);
 

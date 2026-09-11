@@ -2,6 +2,7 @@ import 'package:path/path.dart' as p;
 
 import '../../core/errors/app_error.dart';
 import '../../core/errors/result.dart';
+import '../../core/utils/library_file_utils.dart';
 import '../../core/utils/logger.dart';
 import '../../domain/entities/album.dart';
 import '../../domain/entities/artist.dart';
@@ -57,10 +58,11 @@ final class SongRepositoryImpl implements SongRepository {
   @override
   Future<Result<Song>> getSongByPath(String filePath) async {
     try {
-      final row = await _dao.getSongByPath(filePath);
+      final normalizedPath = normalizeLibraryFilePath(filePath);
+      final row = await _dao.getSongByPath(normalizedPath);
       if (row == null) {
         return Result.failure(
-          AppError.notFound(message: 'Song not found: $filePath'),
+          AppError.notFound(message: 'Song not found: $normalizedPath'),
         );
       }
       return Result.success(row.toEntity());
@@ -239,6 +241,17 @@ final class SongRepositoryImpl implements SongRepository {
       return const Result.success(null);
     } catch (e, st) {
       AppLogger.error('deleteSong failed', tag: 'SongRepo', error: e, stackTrace: st);
+      return Result.failure(AppError.database(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Result<void>> clearAllSongs() async {
+    try {
+      await _dao.clearAllSongs();
+      return const Result.success(null);
+    } catch (e, st) {
+      AppLogger.error('clearAllSongs failed', tag: 'SongRepo', error: e, stackTrace: st);
       return Result.failure(AppError.database(message: e.toString()));
     }
   }

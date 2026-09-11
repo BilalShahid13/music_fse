@@ -6,7 +6,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/localization/generated/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../platform/xinput/gamepad_scroll_target_mixin.dart';
 import '../../providers/keyboard_shortcuts_provider.dart';
+import '../../providers/navigation_provider.dart';
 import '../../providers/toast_provider.dart';
 import '../../widgets/focus_highlight.dart';
 import '../../widgets/shortcut_capture_dialog.dart';
@@ -19,7 +21,9 @@ class KeyboardShortcutEditorPage extends ConsumerStatefulWidget {
   ConsumerState<KeyboardShortcutEditorPage> createState() => _KeyboardShortcutEditorPageState();
 }
 
-class _KeyboardShortcutEditorPageState extends ConsumerState<KeyboardShortcutEditorPage> {
+class _KeyboardShortcutEditorPageState
+  extends ConsumerState<KeyboardShortcutEditorPage>
+  with GamepadScrollTargetMixin {
   late final FocusNode _resetFocusNode;
   late final FocusNode _keyListenerFocusNode;
 
@@ -43,6 +47,9 @@ class _KeyboardShortcutEditorPageState extends ConsumerState<KeyboardShortcutEdi
     final tt = Theme.of(context).textTheme;
     final l10n = AppLocalizations.of(context)!;
     final shortcutsAsync = ref.watch(keyboardShortcutsProvider);
+    final currentRoute = ref.watch(navigationProvider);
+
+    syncGamepadScrollTarget(currentRoute == '/settings/shortcuts');
 
     return KeyboardListener(
       focusNode: _keyListenerFocusNode,
@@ -96,6 +103,7 @@ class _KeyboardShortcutEditorPageState extends ConsumerState<KeyboardShortcutEdi
                     child: Text(l10n.errorLoadingShortcuts, style: tt.bodyMedium?.copyWith(color: ext.textSecondary)),
                   ),
                   data: (configs) => ListView.builder(
+                    controller: gamepadScrollController,
                     itemCount: configs.length,
                     itemBuilder: (ctx, i) {
                       final config = configs[i];

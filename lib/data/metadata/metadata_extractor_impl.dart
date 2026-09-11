@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:metadata_god/metadata_god.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
@@ -90,37 +91,32 @@ final class MetadataExtractorImpl implements MetadataExtractor {
   @override
   Future<String?> extractArt(String filePath, String cacheDir) async {
     try {
-      final meta = await MetadataGod.readMetadata(file: filePath);
-      final picture = meta.picture;
-      if (picture == null) return null;
+      await Directory(cacheDir).create(recursive: true);
 
-      final rawBytes = picture.data;
-      if (rawBytes.isEmpty) return null;
+      Metadata? meta;
+      try {
+        meta = await MetadataGod.readMetadata(file: filePath);
+      } catch (e) {
+        AppLogger.warn('Failed to read art metadata for $filePath: $e', tag: 'MetadataExtractor');
+      }
 
-      final bytes = rawBytes;
+      final picture = meta?.picture;
+      if (picture != null && picture.data.isNotEmpty) {
+        return _writeCachedArt(
+          bytes: picture.data,
+          cacheDir: cacheDir,
+          cacheKey: _artCacheKey(filePath, meta),
+        );
+      }
 
-      final decoded = img.decodeImage(bytes);
-      if (decoded == null) return null;
+      final sidecarPath = await _findSidecarArtPath(filePath);
+      if (sidecarPath == null) return null;
 
-      // Resize to 300×300, preserving nothing larger — memory budget matters.
-      final resized = img.copyResize(
-        decoded,
-        width: 300,
-        height: 300,
-        interpolation: img.Interpolation.linear,
+      return _writeCachedArt(
+        bytes: await File(sidecarPath).readAsBytes(),
+        cacheDir: cacheDir,
+        cacheKey: _artCacheKey(filePath, meta),
       );
-
-      final jpeg = img.encodeJpg(resized, quality: 85);
-
-      // Cache key: stable hash of (albumArtist, album) so all songs in the
-      // same album reuse one cached file.
-      final albumArtist = _nonEmpty(meta.albumArtist) ?? _nonEmpty(meta.artist) ?? 'Unknown Artist';
-      final album = _nonEmpty(meta.album) ?? 'Unknown Album';
-      final cacheKey = _stableHash('$albumArtist\x00$album');
-      final cachePath = p.join(cacheDir, 'art_$cacheKey.jpg');
-
-      await File(cachePath).writeAsBytes(jpeg);
-      return cachePath;
     } catch (e, st) {
       AppLogger.error('extractArt failed for $filePath', tag: 'MetadataExtractor', error: e, stackTrace: st);
       return null;
@@ -136,6 +132,62 @@ final class MetadataExtractorImpl implements MetadataExtractor {
     if (value == null) return null;
     final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;
+  }
+
+  static Future<String?> _findSidecarArtPath(String filePath) async {
+    final directory = Directory(p.dirname(filePath));
+    if (!await directory.exists()) return null;
+
+    const candidates = <String>[
+      'cover.jpg',
+      'cover.png',
+      'folder.jpg',
+      'folder.png',
+      'album.jpg',
+      'album.png',
+      'albumartsmall.jpg',
+      'albumartsmall.png',
+    ];
+
+    for (final candidate in candidates) {
+      final file = File(p.join(directory.path, candidate));
+      if (await file.exists()) {
+        return file.path;
+      }
+    }
+
+    return null;
+  }
+
+  static Future<String?> _writeCachedArt({
+    required List<int> bytes,
+    required String cacheDir,
+    required String cacheKey,
+  }) async {
+    final decoded = img.decodeImage(Uint8List.fromList(bytes));
+    if (decoded == null) return null;
+
+    final resized = img.copyResize(
+      decoded,
+      width: 300,
+      height: 300,
+      interpolation: img.Interpolation.linear,
+    );
+
+    final jpeg = img.encodeJpg(resized, quality: 85);
+    final cachePath = p.join(cacheDir, 'art_$cacheKey.jpg');
+    await File(cachePath).writeAsBytes(jpeg);
+    return cachePath;
+  }
+
+  static String _artCacheKey(String filePath, Metadata? meta) {
+    final albumArtist = _nonEmpty(meta?.albumArtist) ?? _nonEmpty(meta?.artist);
+    final album = _nonEmpty(meta?.album);
+    if (albumArtist != null && album != null) {
+      return _stableHash('$albumArtist\x00$album');
+    }
+
+    return _stableHash(p.dirname(filePath).toLowerCase());
   }
 
   /// Produces a stable 8-hex-character hash of [input] suitable for use in

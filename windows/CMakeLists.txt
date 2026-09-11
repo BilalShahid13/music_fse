@@ -49,6 +49,128 @@ endfunction()
 set(FLUTTER_MANAGED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/flutter")
 add_subdirectory(${FLUTTER_MANAGED_DIR})
 
+function(patch_cargokit_symlink_resolver plugin_name)
+  set(script_path "${FLUTTER_MANAGED_DIR}/ephemeral/.plugin_symlinks/${plugin_name}/cargokit/cmake/resolve_symlinks.ps1")
+  if(NOT EXISTS "${script_path}")
+  return()
+  endif()
+
+  file(WRITE "${script_path}" [=[function Normalize-LinkTarget {
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [Parameter(Mandatory)]
+    [object] $Target,
+    [Parameter(Mandatory)]
+    [string] $BasePath
+  )
+
+  if ($Target -is [array]) {
+    $Target = $Target[0]
+  }
+
+  [string] $normalized = [string] $Target
+  $normalized = $normalized.Trim()
+  $normalized = $normalized -replace '^[\\/]\?\?[\\/]', ''
+  $normalized = $normalized -replace '^[\\/]{2}\?[\\/]', ''
+
+  if (-not [System.IO.Path]::IsPathRooted($normalized)) {
+    $normalized = Join-Path $BasePath $normalized
+  }
+
+  return [System.IO.Path]::GetFullPath($normalized)
+}
+
+function Resolve-Symlinks {
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [Parameter(Position = 0, Mandatory, ValueFromPipeline, ValueFromPipelineByPropertyName)]
+    [string] $Path
+  )
+
+  [string] $fullPath = [System.IO.Path]::GetFullPath($Path)
+  [string[]] $parts = $fullPath -split '[\\/]'
+  [string] $realPath = ''
+  [int] $startIndex = 0
+
+  if ($parts.Length -gt 0 -and $parts[0].EndsWith(':')) {
+    $realPath = "$($parts[0])\\"
+    $startIndex = 1
+  }
+
+  for ($index = $startIndex; $index -lt $parts.Length; $index++) {
+    [string] $part = $parts[$index]
+    if ([string]::IsNullOrWhiteSpace($part)) {
+      continue
+    }
+
+    if ([string]::IsNullOrEmpty($realPath) -or $realPath -eq '\\') {
+      $realPath = "$realPath$part"
+    } else {
+      $realPath = Join-Path $realPath $part
+    }
+
+    $item = Get-Item -LiteralPath $realPath -Force -ErrorAction Stop
+    if ($null -ne $item.LinkTarget) {
+      $realPath = Normalize-LinkTarget -Target $item.LinkTarget -BasePath (Split-Path -Parent $realPath)
+    }
+  }
+
+  $realPath
+}
+
+$path = Resolve-Symlinks -Path $args[0]
+Write-Host $path
+]=])
+endfunction()
+
+function(ensure_rust_toolchain plugin_name)
+  set(plugin_windows_dir "${FLUTTER_MANAGED_DIR}/ephemeral/.plugin_symlinks/${plugin_name}/windows")
+  if(NOT EXISTS "${plugin_windows_dir}")
+    return()
+  endif()
+
+  find_program(CARGO_EXECUTABLE cargo)
+  find_program(RUSTC_EXECUTABLE rustc)
+  if(NOT CARGO_EXECUTABLE OR NOT RUSTC_EXECUTABLE)
+    message(FATAL_ERROR
+      "Windows builds require the Rust toolchain because ${plugin_name} is built via CargoKit. "
+      "Install Rust with rustup (https://rustup.rs/) so both cargo and rustc are on PATH, then restart your terminal and rerun the build."
+    )
+  endif()
+endfunction()
+
+function(patch_just_audio_windows_disable_auto_smtc)
+  set(player_header_path "${FLUTTER_MANAGED_DIR}/ephemeral/.plugin_symlinks/just_audio_windows/windows/player.hpp")
+  if(NOT EXISTS "${player_header_path}")
+    return()
+  endif()
+
+  file(READ "${player_header_path}" player_header_contents)
+  string(REPLACE "\r\n" "\n" player_header_contents "${player_header_contents}")
+
+  string(REPLACE
+    "    id = idx;\n\n    // Set up channels"
+    "    id = idx;\n\n    // Music FSE provides its own Windows SMTC session via smtc_windows.\n    // Disable MediaPlayer's automatic SMTC bridge to avoid duplicate media tiles.\n    mediaPlayer.CommandManager().IsEnabled(false)\;\n\n    // Set up channels"
+    patched_player_header_contents
+    "${player_header_contents}"
+  )
+  string(REPLACE "\\;" ";" patched_player_header_contents "${patched_player_header_contents}")
+
+  if("${player_header_contents}" STREQUAL "${patched_player_header_contents}")
+    return()
+  endif()
+
+  file(WRITE "${player_header_path}" "${patched_player_header_contents}")
+endfunction()
+
+patch_cargokit_symlink_resolver(metadata_god)
+patch_cargokit_symlink_resolver(smtc_windows)
+ensure_rust_toolchain(metadata_god)
+ensure_rust_toolchain(smtc_windows)
+patch_just_audio_windows_disable_auto_smtc()
+
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
 

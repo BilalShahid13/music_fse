@@ -39,7 +39,6 @@ class EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final ext = context.appTheme;
     final tt = Theme.of(context).textTheme;
-    final accent = Theme.of(context).colorScheme.primary;
 
     return Center(
       child: SingleChildScrollView(
@@ -66,11 +65,7 @@ class EmptyState extends StatelessWidget {
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: onAction,
-                style: FilledButton.styleFrom(backgroundColor: accent),
-                child: Text(
-                  actionLabel!,
-                  style: tt.labelLarge?.copyWith(color: Colors.white),
-                ),
+                child: Text(actionLabel!),
               ),
             ],
           ],

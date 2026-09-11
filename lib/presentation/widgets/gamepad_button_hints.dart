@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/constants/app_sizes.dart';
 import '../../core/theme/app_theme.dart';
@@ -27,6 +26,8 @@ class GamepadButtonHints extends StatelessWidget {
     this.startLabel,
     this.leftLabel,
     this.rightLabel,
+    this.upLabel,
+    this.downLabel,
     this.lbLabel,
     this.rbLabel,
     this.onAPressed,
@@ -36,6 +37,8 @@ class GamepadButtonHints extends StatelessWidget {
     this.onStartPressed,
     this.onLeftPressed,
     this.onRightPressed,
+    this.onUpPressed,
+    this.onDownPressed,
     this.onLbPressed,
     this.onRbPressed,
     this.backgroundColor,
@@ -65,6 +68,12 @@ class GamepadButtonHints extends StatelessWidget {
   /// Label for the right directional input.
   final String? rightLabel;
 
+  /// Label for the up directional input.
+  final String? upLabel;
+
+  /// Label for the down directional input.
+  final String? downLabel;
+
   /// Label for the LB (left bumper) button.
   final String? lbLabel;
 
@@ -78,6 +87,8 @@ class GamepadButtonHints extends StatelessWidget {
   final VoidCallback? onStartPressed;
   final VoidCallback? onLeftPressed;
   final VoidCallback? onRightPressed;
+  final VoidCallback? onUpPressed;
+  final VoidCallback? onDownPressed;
   final VoidCallback? onLbPressed;
   final VoidCallback? onRbPressed;
 
@@ -100,8 +111,9 @@ class GamepadButtonHints extends StatelessWidget {
 
     final hasShoulderHints = lbLabel != null || rbLabel != null;
     final hasDirectionalHints = leftLabel != null || rightLabel != null;
+    final hasVerticalDirectionalHints = upLabel != null || downLabel != null;
 
-    if (hints.isEmpty && !hasShoulderHints && !hasDirectionalHints) {
+    if (hints.isEmpty && !hasShoulderHints && !hasDirectionalHints && !hasVerticalDirectionalHints) {
       return SizedBox(
         height: sizes.buttonHintsHeight,
         child: Material(
@@ -165,6 +177,26 @@ class GamepadButtonHints extends StatelessWidget {
                       textColor: ext.textSecondary,
                       isCompact: compact,
                       onPressed: onRightPressed,
+                    ),
+                ],
+                if (hasVerticalDirectionalHints) ...[
+                  if (hasShoulderHints || hasDirectionalHints) SizedBox(width: compact ? 12.0 : 16.0),
+                  if (upLabel != null)
+                    _BumperHintItem(
+                      label: upLabel!,
+                      buttonText: '↑',
+                      textColor: ext.textSecondary,
+                      isCompact: compact,
+                      onPressed: onUpPressed,
+                    ),
+                  if (upLabel != null && downLabel != null) SizedBox(width: compact ? 12.0 : 16.0),
+                  if (downLabel != null)
+                    _BumperHintItem(
+                      label: downLabel!,
+                      buttonText: '↓',
+                      textColor: ext.textSecondary,
+                      isCompact: compact,
+                      onPressed: onDownPressed,
                     ),
                 ],
                 const Spacer(),
@@ -231,6 +263,7 @@ class _HintItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final badgeLabelGap = isCompact ? 6.0 : 8.0;
     final labelSize = isCompact ? 12.0 : 14.0;
+    final baseStyle = Theme.of(context).textTheme.labelLarge;
 
     final content = Row(
       mainAxisSize: MainAxisSize.min,
@@ -239,7 +272,7 @@ class _HintItem extends StatelessWidget {
         SizedBox(width: badgeLabelGap),
         Text(
           hint.label,
-          style: GoogleFonts.inter(
+          style: baseStyle?.copyWith(
             fontSize: labelSize,
             fontWeight: FontWeight.w600,
             color: textColor,
@@ -273,26 +306,36 @@ class _ButtonCircle extends StatelessWidget {
   Widget build(BuildContext context) {
     final diameter = isCompact ? 22.0 : 28.0;
     final fontSize = isCompact ? 12.0 : 15.0;
+    final verticalOffset = isCompact ? -0.5 : -0.75;
+    final baseStyle = Theme.of(context).textTheme.labelLarge;
 
     return Container(
       width: diameter,
       height: diameter,
       decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       alignment: Alignment.center,
-      child: Text(
-        letter,
-        textAlign: TextAlign.center,
-        strutStyle: StrutStyle(
-          fontSize: fontSize,
-          height: 1,
-          forceStrutHeight: true,
-        ),
-        style: GoogleFonts.inter(
-          fontSize: fontSize,
-          fontWeight: FontWeight.w900,
-          color: Colors.white,
-          height: 1,
-          decoration: TextDecoration.none,
+      child: Transform.translate(
+        offset: Offset(0, verticalOffset),
+        child: Text(
+          letter,
+          textAlign: TextAlign.center,
+          textHeightBehavior: const TextHeightBehavior(
+            applyHeightToFirstAscent: false,
+            applyHeightToLastDescent: false,
+          ),
+          strutStyle: StrutStyle(
+            fontSize: fontSize,
+            height: 1,
+            leading: 0,
+            forceStrutHeight: true,
+          ),
+          style: baseStyle?.copyWith(
+            fontSize: fontSize,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+            height: 1,
+            decoration: TextDecoration.none,
+          ),
         ),
       ),
     );
@@ -316,6 +359,7 @@ class _StartHintItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final badgeLabelGap = isCompact ? 6.0 : 8.0;
     final labelSize = isCompact ? 12.0 : 14.0;
+    final baseStyle = Theme.of(context).textTheme.labelLarge;
 
     final content = Row(
       mainAxisSize: MainAxisSize.min,
@@ -324,7 +368,7 @@ class _StartHintItem extends StatelessWidget {
         SizedBox(width: badgeLabelGap),
         Text(
           label,
-          style: GoogleFonts.inter(
+          style: baseStyle?.copyWith(
             fontSize: labelSize,
             fontWeight: FontWeight.w600,
             color: textColor,
@@ -413,6 +457,7 @@ class _BumperHintItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final badgeLabelGap = isCompact ? 6.0 : 8.0;
     final labelSize = isCompact ? 12.0 : 14.0;
+    final baseStyle = Theme.of(context).textTheme.labelLarge;
 
     final content = Row(
       mainAxisSize: MainAxisSize.min,
@@ -421,7 +466,7 @@ class _BumperHintItem extends StatelessWidget {
         SizedBox(width: badgeLabelGap),
         Text(
           label,
-          style: GoogleFonts.inter(
+          style: baseStyle?.copyWith(
             fontSize: labelSize,
             fontWeight: FontWeight.w600,
             color: textColor,
@@ -455,6 +500,7 @@ class _BumperBadge extends StatelessWidget {
     final ext = context.appTheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final badgeHeight = isCompact ? 20.0 : 22.0;
+    final baseStyle = Theme.of(context).textTheme.labelLarge;
 
     final badgeFill = isDark ? Colors.white.withValues(alpha: 0.15) : ext.bgCard.withValues(alpha: 0.92);
     final badgeBorder = isDark ? Colors.white.withValues(alpha: 0.4) : ext.borderSubtle.withValues(alpha: 0.9);
@@ -474,7 +520,7 @@ class _BumperBadge extends StatelessWidget {
       alignment: Alignment.center,
       child: Text(
         text,
-        style: GoogleFonts.inter(
+        style: baseStyle?.copyWith(
           fontSize: 10,
           fontWeight: FontWeight.w800,
           color: badgeText,
